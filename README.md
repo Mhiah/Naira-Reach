@@ -153,7 +153,13 @@ Result: a line starting `st:celo:0x…`. That is safe to share. The keys behind 
 
 ### 4. Client: set up the wallet
 
-On the client's device, with `CLIENT_ADMIN_PRIVATE_KEY` set:
+On the client's device. First make the wallet's key. It is written straight into `.env` and never shown:
+
+```bash
+npm run reach -- wallet new-key
+```
+
+Back up `.env` somewhere safe, such as a password manager. Then create the wallet:
 
 ```bash
 npm run reach -- wallet setup
@@ -273,6 +279,7 @@ Naira Reach keeps the freelancer's income private from the public. It does not h
 | Command | Who runs it | What it does |
 |---|---|---|
 | `check` | Anyone | Shows what is set up and what is missing |
+| `wallet new-key` | Client | Makes the wallet key and saves it in `.env` without showing it |
 | `wallet setup` | Client | Creates and activates the Altana wallet; registers the ERC-8004 identity |
 | `session grant [--usdt-per-week N] [--cngn-per-week N] [--days N]` | Client | Gives the agent a capped, expiring key |
 | `session revoke` | Client | Removes the agent's key |

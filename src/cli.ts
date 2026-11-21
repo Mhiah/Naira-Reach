@@ -1,8 +1,9 @@
 #!/usr/bin/env node
 // Naira Reach command line. Run with: npm run reach -- <command>
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { parseArgs } from "node:util";
 import { formatUnits, getAddress, isAddress, type Address, type Hex } from "viem";
+import { generatePrivateKey, privateKeyToAccount } from "viem/accounts";
 import { activateClientWallet, clientWalletAddress, grantAgentSession, hasAgentSession, loadAgentSession, refreshTakerProof, revokeAgentSession } from "./altana.ts";
 import { DECIMALS, EXPLORER_TX, TOKENS } from "./celo.ts";
 import { fmt, loadFreelancers, loadLedger, saveFreelancers, type Freelancer } from "./checks.ts";
@@ -18,6 +19,7 @@ import { TextileClient } from "./textile.ts";
 const HELP = `Naira Reach — Paid from anywhere. Privately. Only to you.
 
 Client (the one paying)
+  wallet new-key               Make a fresh key for your Altana wallet and save it in .env (shown nowhere)
   wallet setup                 Create and activate your Altana wallet (also registers its ERC-8004 identity)
   session grant                Give the agent a limited key  [--usdt-per-week 200] [--cngn-per-week 300000] [--days 7]
   session revoke               Take the agent's key back, effective immediately
@@ -45,6 +47,7 @@ async function main() {
       return check();
     case "wallet":
       if (sub === "setup") return walletSetup();
+      if (sub === "new-key") return walletNewKey();
       break;
     case "session":
       if (sub === "grant") return sessionGrant(rest);
@@ -68,6 +71,20 @@ async function main() {
 }
 
 // ---------- client ----------
+
+/** Make the client's wallet key on this computer and write it straight into .env. */
+function walletNewKey() {
+  const envPath = ".env";
+  if (!existsSync(envPath)) throw new ConfigError("No .env file here. Run this from the Naira-Reach folder.");
+  const text = readFileSync(envPath, "utf8");
+  const line = text.match(/^CLIENT_ADMIN_PRIVATE_KEY=(.*)$/m);
+  if (line && line[1]!.trim()) throw new ConfigError("CLIENT_ADMIN_PRIVATE_KEY already has a key. Not replacing it.");
+  const key = generatePrivateKey();
+  const next = line ? text.replace(/^CLIENT_ADMIN_PRIVATE_KEY=.*$/m, `CLIENT_ADMIN_PRIVATE_KEY=${key}`) : `${text.trimEnd()}\nCLIENT_ADMIN_PRIVATE_KEY=${key}\n`;
+  writeFileSync(envPath, next);
+  console.log(`New wallet key saved in .env. Its address: ${privateKeyToAccount(key).address}`);
+  console.log("Back up .env somewhere safe now (a password manager is best). If it is lost, so is the money in this wallet.");
+}
 
 async function walletSetup() {
   const key = privateKey("CLIENT_ADMIN_PRIVATE_KEY", "This is the client's own key for their Altana wallet. It never goes to the agent.");
