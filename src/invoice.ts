@@ -3,9 +3,10 @@
 //     freelancer's private receiving code, registered once by the client.
 //  2. Personal details stay off-chain. Only a fingerprint (keccak256 of the
 //     exact invoice file) is recorded with the payment.
-import { readFileSync } from "node:fs";
-import { extname } from "node:path";
 import { keccak256, toBytes, type Hex } from "viem";
+
+/** An invoice as it arrived: its file name and exact bytes. */
+export type InvoiceFile = { name: string; bytes: Uint8Array };
 
 export type Invoice = {
   invoiceId: string;
@@ -70,11 +71,10 @@ function addressNotes(text: string): string[] {
 
 const addressesIn = (text: string) => [...new Set(text.match(ADDRESS_RE) ?? [])];
 
-export async function readInvoice(path: string, extractWithAi?: (redactedText: string) => Promise<Invoice>): Promise<ReadInvoice> {
-  const bytes = readFileSync(path);
-  const text = bytes.toString("utf8");
-  const fp = fingerprint(new Uint8Array(bytes));
-  if (extname(path).toLowerCase() === ".json") {
+export async function readInvoice(file: InvoiceFile, extractWithAi?: (redactedText: string) => Promise<Invoice>): Promise<ReadInvoice> {
+  const text = new TextDecoder().decode(file.bytes);
+  const fp = fingerprint(file.bytes);
+  if (file.name.toLowerCase().endsWith(".json")) {
     return { invoice: validateInvoice(JSON.parse(text)), fingerprint: fp, notes: addressNotes(text), addresses: addressesIn(text), source: "json" };
   }
   if (!extractWithAi) {

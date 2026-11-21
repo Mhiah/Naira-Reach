@@ -11,16 +11,15 @@ import {
   type SerializedSession,
   type Session,
 } from "@altananetwork/sdk";
-import { existsSync, mkdirSync, readFileSync, renameSync } from "node:fs";
 import { parseUnits, type Address, type Hex } from "viem";
 import { generatePrivateKey, privateKeyToAccount } from "viem/accounts";
 import { CELO_CHAIN_ID, DECIMALS, TEXTILE_REACTOR, TOKENS } from "./celo.ts";
-import { readJson, statePath, writeJson } from "./config.ts";
+import { moveRecord, store } from "./store.ts";
 import { saveStoredProof, signTakerProof } from "./proof.ts";
 
-const SESSION_FILE = () => statePath("session.json");
-const SESSION_KEY_FILE = () => statePath("session.key");
-const CLIENT_FILE = () => statePath("client.json");
+const SESSION = "session.json";
+const SESSION_KEY = "session.key";
+const CLIENT = "client.json";
 
 /** Relay fees: USD₮ if the Celo relay accepts it, otherwise CELO. */
 export const FEE_TOKENS = [TOKENS.USDT, NATIVE_TOKEN] as const;
@@ -72,8 +71,8 @@ function altana() {
 /** What this computer knows about the client's wallet. No keys. */
 export type ClientRecord = { walletAddress?: Address; activatedAt?: string; activationTx?: Hex; agentId?: string };
 
-export const loadClientRecord = () => readJson<ClientRecord>(CLIENT_FILE(), {});
-const saveClientRecord = (patch: ClientRecord) => writeJson(CLIENT_FILE(), { ...loadClientRecord(), ...patch });
+export const loadClientRecord = () => store().read<ClientRecord>(CLIENT, {});
+const saveClientRecord = (patch: ClientRecord) => store().write(CLIENT, { ...loadClientRecord(), ...patch });
 
 /** Step 1 (client): create the wallet and make its first action, which also registers its ERC-8004 identity. */
 export async function setupClientWallet(adminKey: Hex) {
@@ -107,7 +106,7 @@ export async function grantAgentSession(adminKey: Hex, limits: SessionLimits) {
   const { client, wallet, signer } = await setupClientWallet(adminKey);
   // Our own key, saved before the grant, so a crash can never strand an authorized key.
   const sessionKey = generatePrivateKey();
-  writeJson(SESSION_KEY_FILE(), { privateKey: sessionKey }, true);
+  store().write(SESSION_KEY, { privateKey: sessionKey }, true);
   const sessionSigner = signerFromPrivateKey(sessionKey);
   const session = await client.grantSession({
     wallet,
@@ -120,7 +119,7 @@ export async function grantAgentSession(adminKey: Hex, limits: SessionLimits) {
   if (session.status !== "granted") {
     throw new Error(`Grant failed: ${JSON.stringify(session.legs.filter((l) => l.status === "FAILED"))}`);
   }
-  writeJson(SESSION_FILE(), serializeSession(session));
+  store().write(SESSION, serializeSession(session));
   await refreshTakerProof(adminKey);
   return session;
 }
@@ -148,28 +147,27 @@ export async function revokeAgentSession(adminKey: Hex) {
   const result = await client.revokeSession({ wallet, signer, session, feeToken: FEE_TOKENS });
   if (result.status === "revoked" || result.status === "CONFIRMED") {
     // The key is dead on-chain. Move it out of the way so nothing tries to use it again.
-    const dir = statePath(`revoked/${Date.now()}`);
-    mkdirSync(dir, { recursive: true });
-    renameSync(SESSION_FILE(), `${dir}/session.json`);
-    renameSync(SESSION_KEY_FILE(), `${dir}/session.key`);
+    const dir = `revoked/${Date.now()}`;
+    moveRecord(SESSION, `${dir}/session.json`);
+    moveRecord(SESSION_KEY, `${dir}/session.key`, true);
   }
   return result;
 }
 
 export function hasAgentSession(): boolean {
-  return existsSync(SESSION_FILE()) && existsSync(SESSION_KEY_FILE());
+  return store().exists(SESSION) && store().exists(SESSION_KEY);
 }
 
 /** The stored half of the session (limits and expiry, no key), for showing the client. */
 export function storedSession(): SerializedSession | undefined {
-  return hasAgentSession() ? (readJson<SerializedSession | null>(SESSION_FILE(), null) ?? undefined) : undefined;
+  return hasAgentSession() ? (store().read<SerializedSession | null>(SESSION, null) ?? undefined) : undefined;
 }
 
 /** The agent's side: rebuild the live session from local state. */
 export function loadAgentSession(): Session {
   if (!hasAgentSession()) throw new Error("No agent session yet. The client runs `npm run reach -- session grant` first.");
-  const stored = readJson<SerializedSession | null>(SESSION_FILE(), null);
-  const { privateKey } = JSON.parse(readFileSync(SESSION_KEY_FILE(), "utf8")) as { privateKey: Hex };
+  const stored = store().read<SerializedSession | null>(SESSION, null);
+  const { privateKey } = store().read<{ privateKey: Hex }>(SESSION_KEY, { privateKey: "0x" });
   if (!stored) throw new Error("Session file is empty.");
   const session = deserializeSession(stored, signerFromPrivateKey(privateKey));
   if (session.expiry * 1000 <= Date.now()) throw new Error("The agent's session has expired. The client grants a new one.");

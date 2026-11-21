@@ -2,22 +2,22 @@
 // a private payout and move the naira wherever they like (their own wallet, or an
 // exchange deposit address to cash out). The website does the same in the browser.
 import type { Address, PublicClient } from "viem";
-import { readJson, statePath, writeJson } from "./config.ts";
+import { store } from "./store.ts";
 import { movePayout } from "./move.ts";
 import { generateMetaKeys, type MetaKeys, type StealthPayout } from "./stealth.ts";
 
-const KEYS_FILE = () => statePath("freelancer-keys.json");
+const KEYS = "freelancer-keys.json";
 
 export function createFreelancerKeys(): MetaKeys {
-  const existing = readJson<MetaKeys | null>(KEYS_FILE(), null);
+  const existing = store().read<MetaKeys | null>(KEYS, null);
   if (existing) return existing;
   const keys = generateMetaKeys();
-  writeJson(KEYS_FILE(), keys, true);
+  store().write(KEYS, keys, true);
   return keys;
 }
 
 export function loadFreelancerKeys(): MetaKeys {
-  const keys = readJson<MetaKeys | null>(KEYS_FILE(), null);
+  const keys = store().read<MetaKeys | null>(KEYS, null);
   if (!keys) throw new Error("No receiving keys on this device. Run `npm run reach -- freelancer keys` first.");
   return keys;
 }

@@ -1,4 +1,6 @@
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync } from "node:fs";
+import { invoiceFromPath } from "../src/filestore.ts";
+import { store } from "../src/store.ts";
 import { beforeEach, describe, expect, it } from "vitest";
 import { decodeFunctionData, erc20Abi, getAddress, type Address, type Hex, type PublicClient } from "viem";
 import { privateKeyToAccount } from "viem/accounts";
@@ -95,7 +97,7 @@ describe("paying an invoice end to end (no network)", () => {
     const invoice = writeFile(dir, "inv.json", JSON.stringify({ invoiceId: "INV-7", freelancer: "ada", amountNgn: 150000 }));
     const textile = textileReplying("103500000", "150000000000");
     const ex = new FakeExecutor();
-    const out = await payInvoice(invoice, deps(ex, textile.fn));
+    const out = await payInvoice(invoiceFromPath(invoice), deps(ex, textile.fn));
 
     expect(out.status).toBe("paid");
     if (out.status !== "paid") return;
@@ -114,7 +116,7 @@ describe("paying an invoice end to end (no network)", () => {
     // Textile was told the hash; ledger and receipt written, with no personal details.
     expect(textile.calls[1]!.url).toBe("https://textile.test/v2/rfq/rfq_1/submit");
     expect(loadLedger()).toHaveLength(1);
-    const receipt = JSON.parse(readFileSync(out.receiptPath, "utf8"));
+    const receipt = store().read<any>(out.receiptPath, null);
     expect(receipt.payout.ephemeralPublicKey).toBe(out.plan.payout.ephemeralPublicKey);
     expect(receipt.invoice.fingerprint).toMatch(/^0x[0-9a-f]{64}$/);
     expect(out.plan.usdtCost).toBeCloseTo(103.5);
@@ -123,7 +125,7 @@ describe("paying an invoice end to end (no network)", () => {
   it("without an API key, proves control of the paying wallet instead", async () => {
     const invoice = writeFile(dir, "inv.json", JSON.stringify({ invoiceId: "INV-K", freelancer: "ada", amountNgn: 1000 }));
     const textile = textileReplying("700000", "1000000000");
-    const out = await payInvoice(invoice, {
+    const out = await payInvoice(invoiceFromPath(invoice), {
       ...deps(new FakeExecutor(), textile.fn),
       textile: new TextileClient("https://textile.test/v2", undefined, textile.fn),
       textileKeyless: true,
@@ -136,8 +138,8 @@ describe("paying an invoice end to end (no network)", () => {
   it("refuses to pay the same invoice twice", async () => {
     const invoice = writeFile(dir, "inv.json", JSON.stringify({ invoiceId: "INV-7", freelancer: "ada", amountNgn: 150000 }));
     const ex = new FakeExecutor();
-    await payInvoice(invoice, deps(ex, textileReplying("103500000", "150000000000").fn));
-    const again = await payInvoice(invoice, deps(ex, textileReplying("103500000", "150000000000").fn));
+    await payInvoice(invoiceFromPath(invoice), deps(ex, textileReplying("103500000", "150000000000").fn));
+    const again = await payInvoice(invoiceFromPath(invoice), deps(ex, textileReplying("103500000", "150000000000").fn));
     expect(again.status).toBe("held");
     expect(ex.sent).toHaveLength(1);
   });
@@ -146,7 +148,7 @@ describe("paying an invoice end to end (no network)", () => {
     const attacker = "0x9999999999999999999999999999999999999999";
     const invoice = writeFile(dir, "inv.json", JSON.stringify({ invoiceId: "INV-8", freelancer: "ada", amountNgn: 1000, payTo: attacker }));
     const ex = new FakeExecutor();
-    const out = await payInvoice(invoice, deps(ex, textileReplying("700000", "1000000000").fn));
+    const out = await payInvoice(invoiceFromPath(invoice), deps(ex, textileReplying("700000", "1000000000").fn));
     expect(out.notes.join()).toMatch(/wallet address/);
     expect(JSON.stringify(ex.sent).toLowerCase()).not.toContain(attacker.slice(2));
   });
@@ -154,7 +156,7 @@ describe("paying an invoice end to end (no network)", () => {
   it("holds when the dollar cost is above the client's ceiling, and sends nothing", async () => {
     const invoice = writeFile(dir, "inv.json", JSON.stringify({ invoiceId: "INV-9", freelancer: "ada", amountNgn: 150000 }));
     const ex = new FakeExecutor();
-    const out = await payInvoice(invoice, deps(ex, textileReplying("103500000", "150000000000").fn, { maxUsdt: 50 }));
+    const out = await payInvoice(invoiceFromPath(invoice), deps(ex, textileReplying("103500000", "150000000000").fn, { maxUsdt: 50 }));
     expect(out.status).toBe("held");
     expect(ex.sent).toHaveLength(0);
   });
@@ -162,7 +164,7 @@ describe("paying an invoice end to end (no network)", () => {
   it("holds when the firm price is above what the client approved, even with holds approved", async () => {
     const invoice = writeFile(dir, "inv.json", JSON.stringify({ invoiceId: "INV-9b", freelancer: "ada", amountNgn: 150000 }));
     const ex = new FakeExecutor();
-    const out = await payInvoice(invoice, deps(ex, textileReplying("103500000", "150000000000").fn, { approvedUsdt: 103, approveHolds: true }));
+    const out = await payInvoice(invoiceFromPath(invoice), deps(ex, textileReplying("103500000", "150000000000").fn, { approvedUsdt: 103, approveHolds: true }));
     expect(out.status).toBe("held");
     if (out.status === "held") expect(out.holds[0]).toMatch(/price moved/);
     expect(ex.sent).toHaveLength(0);
@@ -172,9 +174,9 @@ describe("paying an invoice end to end (no network)", () => {
   it("a held invoice that is later paid is no longer listed as held", async () => {
     const invoice = writeFile(dir, "inv.json", JSON.stringify({ invoiceId: "INV-9c", freelancer: "ada", amountNgn: 150000 }));
     const ex = new FakeExecutor();
-    await payInvoice(invoice, deps(ex, textileReplying("103500000", "150000000000").fn, { approvedUsdt: 100 }));
+    await payInvoice(invoiceFromPath(invoice), deps(ex, textileReplying("103500000", "150000000000").fn, { approvedUsdt: 100 }));
     expect(loadHolds()).toHaveLength(1);
-    const out = await payInvoice(invoice, deps(ex, textileReplying("103500000", "150000000000").fn, { approvedUsdt: 104.6 }));
+    const out = await payInvoice(invoiceFromPath(invoice), deps(ex, textileReplying("103500000", "150000000000").fn, { approvedUsdt: 104.6 }));
     expect(out.status).toBe("paid");
     expect(loadHolds()).toEqual([]);
   });
@@ -182,18 +184,18 @@ describe("paying an invoice end to end (no network)", () => {
   it("refuses a quote that points at another contract", async () => {
     const invoice = writeFile(dir, "inv.json", JSON.stringify({ invoiceId: "INV-10", freelancer: "ada", amountNgn: 1000 }));
     const evil = textileReplying("700000", "1000000000", { reactor: getAddress("0x00000000000000000000000000000000000bad01") });
-    await expect(payInvoice(invoice, deps(new FakeExecutor(), evil.fn))).rejects.toThrow(/unexpected contract/);
+    await expect(payInvoice(invoiceFromPath(invoice), deps(new FakeExecutor(), evil.fn))).rejects.toThrow(/unexpected contract/);
   });
 
   it("refuses a quote that delivers less naira than billed", async () => {
     const invoice = writeFile(dir, "inv.json", JSON.stringify({ invoiceId: "INV-11", freelancer: "ada", amountNgn: 1000 }));
-    await expect(payInvoice(invoice, deps(new FakeExecutor(), textileReplying("700000", "999000000").fn))).rejects.toThrow(/less naira/);
+    await expect(payInvoice(invoiceFromPath(invoice), deps(new FakeExecutor(), textileReplying("700000", "999000000").fn))).rejects.toThrow(/less naira/);
   });
 
   it("dry run uses the preview: no wallet, no firm quote, nothing sent", async () => {
     const invoice = writeFile(dir, "inv.json", JSON.stringify({ invoiceId: "INV-12", freelancer: "ada", amountNgn: 1000 }));
     const textile = textileReplying("700000", "1000000000");
-    const out = await payInvoice(invoice, { ...deps(new FakeExecutor(), textile.fn, { dryRun: true }), executor: undefined });
+    const out = await payInvoice(invoiceFromPath(invoice), { ...deps(new FakeExecutor(), textile.fn, { dryRun: true }), executor: undefined });
     expect(out.status).toBe("planned");
     if (out.status === "planned") {
       expect(out.preview.steps).toEqual(["approve", "swap", "payout", "gas money"]);
@@ -223,7 +225,7 @@ describe("paying an invoice end to end (no network)", () => {
     const invoice = writeFile(dir, "inv.txt", "INVOICE #A-22\nFrom: Ada Obi (ada@mail.com, 08031234567)\nGTBank 0123456789\nTotal due: ₦45,000");
     const ai = fakeFetch(() => ({ body: { content: [{ type: "tool_use", input: { invoiceId: "A-22", freelancer: "Ada Obi", amountNgn: 45000 } }] } }));
     const out = await payInvoice(
-      invoice,
+      invoiceFromPath(invoice),
       deps(new FakeExecutor(), textileReplying("31000000", "45000000000").fn, { dryRun: true, extractor: anthropicExtractor("sk-test", "claude-sonnet-5-5", ai.fn) }),
     );
     expect(out.status).toBe("planned");

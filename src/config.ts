@@ -1,12 +1,13 @@
+// Settings from .env on the client's computer. Importing this also tells the
+// agent to keep its records as files (see src/filestore.ts).
 import "dotenv/config";
-import { mkdirSync, readFileSync, writeFileSync, existsSync, chmodSync } from "node:fs";
-import { dirname, join } from "node:path";
 import { isHex, type Hex } from "viem";
 import { DEFAULT_RPC_URL, TEXTILE_API_URL } from "./celo.ts";
+import { fileStore } from "./filestore.ts";
+import { useStore } from "./store.ts";
 
-/** Where Naira Reach keeps its local state (gitignored). Read lazily so tests can point it elsewhere. */
-export const stateDir = () => process.env.NAIRA_REACH_HOME?.trim() || ".naira-reach";
-export const receiptsDir = () => process.env.NAIRA_REACH_RECEIPTS?.trim() || "receipts";
+useStore(fileStore);
+export { receiptsDir, stateDir } from "./filestore.ts";
 
 const CODE_RE = /^[a-z0-9_]{1,32}$/;
 
@@ -51,26 +52,3 @@ export const settings = {
   /** Optional ERC-5564 announcer contract on Celo. Without it, the one-time key travels in the receipt only. */
   announcer: () => opt("STEALTH_ANNOUNCER_ADDRESS") as Hex | undefined,
 };
-
-// ---------- small JSON state helpers ----------
-
-export function statePath(file: string): string {
-  return join(stateDir(), file);
-}
-
-export function readJson<T>(path: string, fallback: T): T {
-  if (!existsSync(path)) return fallback;
-  return JSON.parse(readFileSync(path, "utf8")) as T;
-}
-
-export function writeJson(path: string, value: unknown, secret = false): void {
-  mkdirSync(dirname(path), { recursive: true });
-  writeFileSync(path, JSON.stringify(value, (_k, v) => (typeof v === "bigint" ? v.toString() : v), 2) + "\n");
-  if (secret) {
-    try {
-      chmodSync(path, 0o600);
-    } catch {
-      // Windows ignores POSIX modes; the file is still gitignored.
-    }
-  }
-}

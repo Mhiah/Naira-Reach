@@ -10,6 +10,7 @@ import { fmt, loadFreelancers, loadLedger, saveFreelancers, type Freelancer } fr
 import { claimPayout, createFreelancerKeys } from "./claim.ts";
 import { attributionCode, ConfigError, privateKey, settings } from "./config.ts";
 import { AltanaExecutor, DirectExecutor, publicClient, type Executor } from "./executor.ts";
+import { invoiceFromPath } from "./filestore.ts";
 import { anthropicExtractor } from "./invoice.ts";
 import { payInvoice } from "./pay.ts";
 import { parseMetaAddress } from "./stealth.ts";
@@ -191,7 +192,7 @@ async function pay(argv: string[]) {
       : new AltanaExecutor(loadAgentSession(), code);
   const anthropicKey = settings.anthropicKey();
 
-  const outcome = await payInvoice(invoicePath, {
+  const outcome = await payInvoice(invoiceFromPath(invoicePath), {
     executor,
     textile: new TextileClient(settings.textileUrl(), settings.textileKey()),
     textileKeyless: !settings.textileKey(),

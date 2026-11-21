@@ -17,9 +17,9 @@ import {
   type CheckRow,
   type Freelancer,
 } from "./checks.ts";
-import { receiptsDir, writeJson } from "./config.ts";
+import { store } from "./store.ts";
 import type { Call, Executor } from "./executor.ts";
-import { readInvoice, type Invoice } from "./invoice.ts";
+import { readInvoice, type Invoice, type InvoiceFile } from "./invoice.ts";
 import { erc20Metadata, newStealthAddress, SCHEME_ID, type StealthPayout } from "./stealth.ts";
 import { verifyTag } from "./tag.ts";
 import { quoteExpired, type FirmQuote, type TextileClient } from "./textile.ts";
@@ -52,7 +52,7 @@ export type PayDeps = {
 export type PayOutcome =
   | { status: "held"; holds: string[]; notes: string[] }
   | { status: "planned"; preview: DryRun; notes: string[] }
-  | { status: "paid"; plan: Plan; receiptPath: string; hashes: Hex[]; tags: { hash: Hex; tagged: boolean }[]; notes: string[] }
+  | { status: "paid"; plan: Plan; /** The receipt's record name, receipts/<file>. */ receiptPath: string; hashes: Hex[]; tags: { hash: Hex; tagged: boolean }[]; notes: string[] }
   | { status: "failed"; plan: Plan; hashes: Hex[]; notes: string[] };
 
 export type DryRun = {
@@ -75,11 +75,11 @@ export type Plan = {
   calls: Call[];
 };
 
-export async function payInvoice(invoicePath: string, d: PayDeps): Promise<PayOutcome> {
+export async function payInvoice(file: InvoiceFile, d: PayDeps): Promise<PayOutcome> {
   const log = d.log ?? (() => {});
 
   // 1. Read the invoice. Only redacted text ever reaches the AI reader.
-  const { invoice, fingerprint, notes } = await readInvoice(invoicePath, d.extractor);
+  const { invoice, fingerprint, notes } = await readInvoice(file, d.extractor);
   log(`Invoice ${invoice.invoiceId} from ${invoice.freelancer}: ₦${invoice.amountNgn.toLocaleString("en-NG")}`);
 
   // Every stop on a real run is written down, so the client can see what the agent refused.
@@ -183,8 +183,8 @@ export async function payInvoice(invoicePath: string, d: PayDeps): Promise<PayOu
   const tags = await Promise.all(sent.hashes.map((h) => verifyTag(d.reader, h, d.code).catch(() => ({ hash: h, codes: [], tagged: false }))));
 
   // 10. Receipt and ledger. No names, emails or bank details: just the fingerprint.
-  const receiptPath = `${receiptsDir()}/${safe(invoice.invoiceId)}-${Date.now()}.json`;
-  writeJson(receiptPath, receipt(plan, d, executor, sent.hashes, tags));
+  const receiptPath = `receipts/${safe(invoice.invoiceId)}-${Date.now()}.json`;
+  store().write(receiptPath, receipt(plan, d, executor, sent.hashes, tags));
   recordPaid({
     invoiceId: invoice.invoiceId,
     freelancerId: freelancer.id,
@@ -224,8 +224,8 @@ export type Review = {
  * Read and check an invoice and price it, without a wallet and without sending
  * anything. This is what the client approves; payInvoice then repeats every check.
  */
-export async function reviewInvoice(invoicePath: string, d: ReviewDeps): Promise<Review> {
-  const read = await readInvoice(invoicePath, d.extractor);
+export async function reviewInvoice(file: InvoiceFile, d: ReviewDeps): Promise<Review> {
+  const read = await readInvoice(file, d.extractor);
   const { invoice, fingerprint } = read;
   const check = checkInvoice(invoice, fingerprint, loadFreelancers(), loadLedger());
   const rows = [...check.rows];

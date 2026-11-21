@@ -2,7 +2,7 @@
 // the checks the agent runs before any money moves. A failed check is a hold:
 // the agent stops and the client decides.
 import type { Hex } from "viem";
-import { readJson, statePath, writeJson } from "./config.ts";
+import { store } from "./store.ts";
 import type { Invoice } from "./invoice.ts";
 
 export type Freelancer = {
@@ -55,23 +55,23 @@ export type CheckRow = {
   setup?: boolean;
 };
 
-const FREELANCERS = () => statePath("freelancers.json");
-const LEDGER = () => statePath("ledger.json");
-const HOLDS = () => statePath("holds.json");
+const FREELANCERS = "freelancers.json";
+const LEDGER = "ledger.json";
+const HOLDS = "holds.json";
 
-export const loadFreelancers = () => readJson<Freelancer[]>(FREELANCERS(), []);
-export const saveFreelancers = (list: Freelancer[]) => writeJson(FREELANCERS(), list);
-export const loadLedger = () => readJson<PaidEntry[]>(LEDGER(), []);
-export const recordPaid = (entry: PaidEntry) => writeJson(LEDGER(), [...loadLedger(), entry]);
-export const loadHolds = () => readJson<HeldEntry[]>(HOLDS(), []);
+export const loadFreelancers = () => store().read<Freelancer[]>(FREELANCERS, []);
+export const saveFreelancers = (list: Freelancer[]) => store().write(FREELANCERS, list);
+export const loadLedger = () => store().read<PaidEntry[]>(LEDGER, []);
+export const recordPaid = (entry: PaidEntry) => store().write(LEDGER, [...loadLedger(), entry]);
+export const loadHolds = () => store().read<HeldEntry[]>(HOLDS, []);
 /** An invoice that was held and later paid is no longer held. */
 export const clearHold = (fp: Hex) => {
   const all = loadHolds();
-  if (all.some((h) => h.fingerprint === fp)) writeJson(HOLDS(), all.filter((h) => h.fingerprint !== fp));
+  if (all.some((h) => h.fingerprint === fp)) store().write(HOLDS, all.filter((h) => h.fingerprint !== fp));
 };
 /** Keep one entry per invoice file: checking the same file twice is not a second attempt. */
 export const recordHold = (entry: HeldEntry) =>
-  writeJson(HOLDS(), [...loadHolds().filter((h) => h.fingerprint !== entry.fingerprint), entry].slice(-200));
+  store().write(HOLDS, [...loadHolds().filter((h) => h.fingerprint !== entry.fingerprint), entry].slice(-200));
 
 const norm = (s: string) => s.trim().toLowerCase();
 

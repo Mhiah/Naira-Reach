@@ -1,12 +1,15 @@
 import { mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { fileStore } from "../src/filestore.ts";
+import { useStore } from "../src/store.ts";
 
 /** Point all local state at a fresh temp folder for one test. */
 export function freshState(): string {
   const dir = mkdtempSync(join(tmpdir(), "naira-reach-"));
   process.env.NAIRA_REACH_HOME = join(dir, "state");
   process.env.NAIRA_REACH_RECEIPTS = join(dir, "receipts");
+  useStore(fileStore);
   return dir;
 }
 

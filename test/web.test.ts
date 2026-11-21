@@ -19,7 +19,7 @@ const NOW = Date.parse("2026-11-21T10:00:00Z"); // a Saturday; the week began Mo
 let server: Server;
 let port = 0;
 let dir = "";
-let payCalls: { path: string; opts: { approvedUsdt: number; approveHolds: boolean } }[] = [];
+let payCalls: { file: unknown; opts: { approvedUsdt: number; approveHolds: boolean } }[] = [];
 
 function textile() {
   return fakeFetch((url, init) => {
@@ -227,8 +227,8 @@ describe("invoices", () => {
 
   beforeEach(() =>
     start({
-      pay: async (path, opts) => {
-        payCalls.push({ path, opts });
+      pay: async (file, opts) => {
+        payCalls.push({ file, opts });
         await new Promise((r) => setTimeout(r, 50));
         return paidOutcome();
       },

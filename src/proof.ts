@@ -7,7 +7,7 @@
 //   Textile accepts it for firm quotes for about 12 hours. `proof refresh` renews it.
 import { bytesToHex, getAddress, keccak256, type Address, type Hex } from "viem";
 import type { LocalAccount } from "viem/accounts";
-import { readJson, statePath, writeJson } from "./config.ts";
+import { store } from "./store.ts";
 
 export type TakerProof = {
   nonce: Hex;
@@ -20,7 +20,7 @@ export type TakerProof = {
 /** Textile grants firm quotes about 12 hours on a nonce-secret proof; renew a little before. */
 export const STORED_PROOF_MAX_AGE_MS = 11 * 60 * 60 * 1000;
 
-const PROOF_FILE = () => statePath("taker-proof.json");
+const PROOF = "taker-proof.json";
 
 export function takerControlTypedData(taker: Address, chainId: number, nonce: Hex, issuedAt: number) {
   return {
@@ -55,18 +55,18 @@ export async function signTakerProof(
 }
 
 export function saveStoredProof(proof: TakerProof & { taker: Address; chainId: number }): void {
-  writeJson(PROOF_FILE(), proof, true);
+  store().write(PROOF, proof, true);
 }
 
 /** When the stored proof was signed and for which wallet, without handing out the proof. */
 export function storedProofInfo(): { taker: Address; issuedAt: number; validUntil: number } | undefined {
-  const p = readJson<(TakerProof & { taker: Address }) | null>(PROOF_FILE(), null);
+  const p = store().read<(TakerProof & { taker: Address }) | null>(PROOF, null);
   return p ? { taker: p.taker, issuedAt: p.issuedAt, validUntil: p.issuedAt + STORED_PROOF_MAX_AGE_MS } : undefined;
 }
 
 /** The client's stored proof for the Altana wallet, if it is still fresh. */
 export function loadStoredProof(taker: Address, chainId: number, now = Date.now()): TakerProof {
-  const p = readJson<(TakerProof & { taker: Address; chainId: number }) | null>(PROOF_FILE(), null);
+  const p = store().read<(TakerProof & { taker: Address; chainId: number }) | null>(PROOF, null);
   if (!p || getAddress(p.taker) !== getAddress(taker) || p.chainId !== chainId) {
     throw new Error("No Textile proof for this wallet. The client runs `proof refresh`.");
   }
