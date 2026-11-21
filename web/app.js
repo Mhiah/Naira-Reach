@@ -583,6 +583,7 @@
             <div class="field"><label for="g-days">Lasts (days)</label><input class="input mono" id="g-days" name="days" inputmode="numeric" value="7"></div>
             <div class="wide stack">
               <p class="small muted">It may only approve USD₮, swap on Textile FX, and send cNGN and gas money. Everything else is refused onchain. You sign this with your own key, on this computer.</p>
+              <p class="small muted">Each new key is listed publicly in Altana's KeyStore, which charges a one-time fee of about <strong>10.2 CELO</strong> per key. Keep that much CELO in the wallet before you click.</p>
               <div><button class="btn btn-primary" type="submit" id="g-save" ${ready ? "" : "disabled"}>${icon("key")}Give the agent a key</button></div>
               ${ready ? "" : callout(w.hasKey ? 'Activate your wallet first, on the <a href="#/pay/overview">Overview</a>.' : 'Add your wallet key first. The <a href="#/pay/overview">Overview</a> shows how.', "neutral")}
             </div>
@@ -616,6 +617,7 @@
         <span class="label">Key expires</span>
         <span class="figure">${daysLeft}<span class="unit">${daysLeft === 1 ? "day" : "days"}</span></span>
         <span class="note"><time>${fmtDate(ses.expiresAt)}</time>${badge("Active")}</span>
+        <span class="note">A new key costs about 10.2 CELO</span>
       </article>
     </section>
     <section class="grid-2" aria-label="Permissions">
