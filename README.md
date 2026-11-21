@@ -294,7 +294,8 @@ npm run reach -- session revoke
 | Wallet on Celo mainnet | [`0xB2441B175d620A3Fd5CDef28fA1c6957e6224431`](https://celoscan.io/address/0xB2441B175d620A3Fd5CDef28fA1c6957e6224431), activated |
 | ERC-8004 identity | [Agent #10090, "Naira Reach"](https://8004scan.io/agents/celo/10090), confirmed by the Loops House check |
 | The agent's key | 10 USD₮ and ₦15,000 a week, 14 days, four allowed calls. Listed in Altana's KeyStore: [wallet keys and permissions](https://explorer.altana.network/account/0xB2441B175d620A3Fd5CDef28fA1c6957e6224431) |
-| First payments | Coming next. Transaction links will be listed here. |
+| First payment | ₦2,000 (test invoice TEST-002) for 1.388823 USD₮ at ₦1,440.07 per USD₮, Textile RFQ `rfq_vLcBoGXicFHjHMbv`. Approve, swap, private payout and gas money in one atomic Altana intent: [0x5131…0aea](https://celoscan.io/tx/0x5131fd5b5d14012e6a97a86a6cb4608264a52eebc1f67bf1e47a7a814d410aea) |
+| Attribution on that payment | All four inner calls carry the code. The outer transaction is sent by Altana's relayer, so the code is not at the end of its calldata and Loops House does not count it yet (see Honest limits) |
 | Tests (no network) | 47 passing: tags, private payouts, invoice privacy, every hold, keyless Textile proofs, the price guard, the full pay flow with a mocked Textile and wallet, the website's server and its protections, and the browser's key and receipt handling |
 | Typecheck | Clean |
 
@@ -322,7 +323,8 @@ Naira Reach keeps the freelancer's income private from the public. It does not h
 
 ## Honest limits
 
-- **No payment made yet.** The wallet and the agent's key are live on Celo mainnet. The payment itself has only been tested without a network so far, and the first live payments may surface details the mocks cannot.
+- **Tags inside relayed payments.** A payment through Altana is one transaction sent by Altana's relayer to its Orchestrator, with the client's wallet acting inside it. Our attribution code is on every call inside, but readers that look only at the end of the outer transaction, or that expect it to come from the agent wallet itself (as Loops House does), don't see it. `--direct` sends each step from the wallet itself, tagged at the end, at the cost of not using the agent's limited key.
+- **Textile's smallest swap.** A firm quote must buy at least about ₦1,438 (roughly 1 USD₮). A ₦1,000 test invoice was refused by Textile before anything was sent; ₦2,000 went through.
 - **Textile from an Altana wallet is untested.** Without an API key, Textile needs proof that the paying wallet asked for the quote. An Altana wallet is an EIP-7702 account whose address is the client's own key, so the client signs that proof, and Textile honours it for firm quotes for about 12 hours. Neither that proof nor the swap itself has been tried from an Altana wallet yet.
 - **Tags through the Altana relay.** Every call inside the intent carries the attribution tag, but the relay submits the outer transaction, so the tag may not be readable on it. `pay` reports this for every transaction, and `verify <hash>` checks any one. If the relay hides it, `--direct` sends each step from a plain wallet with the tag on the outer transaction.
 - **The first activation needs CELO.** Altana's one-time registration fee can only be paid in CELO, so a wallet holding only USD₮ can't be activated. About 11 CELO covers it.
