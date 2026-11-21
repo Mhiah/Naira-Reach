@@ -140,10 +140,12 @@
   let dirty = false; // the person is typing: don't redraw under them
 
   async function api(method, path, body) {
+    // Every change is sent as JSON, even with nothing in it: the agent refuses anything else.
+    const sendsBody = method !== "GET";
     const res = await fetch("/api" + path, {
       method,
-      headers: { "x-naira-reach-token": CFG.token || "", ...(body ? { "content-type": "application/json" } : {}) },
-      body: body ? JSON.stringify(body) : undefined,
+      headers: { "x-naira-reach-token": CFG.token || "", ...(sendsBody ? { "content-type": "application/json" } : {}) },
+      body: sendsBody ? JSON.stringify(body || {}) : undefined,
     });
     const out = await res.json().catch(() => ({}));
     if (!res.ok) throw new Error(out.error || `The agent answered ${res.status}.`);
