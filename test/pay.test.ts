@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it } from "vitest";
 import { decodeFunctionData, erc20Abi, getAddress, type Address, type Hex, type PublicClient } from "viem";
 import { privateKeyToAccount } from "viem/accounts";
 import { TEXTILE_REACTOR, TOKENS } from "../src/celo.ts";
-import { loadLedger, saveFreelancers } from "../src/checks.ts";
+import { loadHolds, loadLedger, saveFreelancers } from "../src/checks.ts";
 import type { Call, Executor, SendResult } from "../src/executor.ts";
 import type { TakerProof } from "../src/proof.ts";
 import { anthropicExtractor } from "../src/invoice.ts";
@@ -157,6 +157,26 @@ describe("paying an invoice end to end (no network)", () => {
     const out = await payInvoice(invoice, deps(ex, textileReplying("103500000", "150000000000").fn, { maxUsdt: 50 }));
     expect(out.status).toBe("held");
     expect(ex.sent).toHaveLength(0);
+  });
+
+  it("holds when the firm price is above what the client approved, even with holds approved", async () => {
+    const invoice = writeFile(dir, "inv.json", JSON.stringify({ invoiceId: "INV-9b", freelancer: "ada", amountNgn: 150000 }));
+    const ex = new FakeExecutor();
+    const out = await payInvoice(invoice, deps(ex, textileReplying("103500000", "150000000000").fn, { approvedUsdt: 103, approveHolds: true }));
+    expect(out.status).toBe("held");
+    if (out.status === "held") expect(out.holds[0]).toMatch(/price moved/);
+    expect(ex.sent).toHaveLength(0);
+    expect(loadHolds()[0]).toMatchObject({ invoiceId: "INV-9b", billedBy: "ada" });
+  });
+
+  it("a held invoice that is later paid is no longer listed as held", async () => {
+    const invoice = writeFile(dir, "inv.json", JSON.stringify({ invoiceId: "INV-9c", freelancer: "ada", amountNgn: 150000 }));
+    const ex = new FakeExecutor();
+    await payInvoice(invoice, deps(ex, textileReplying("103500000", "150000000000").fn, { approvedUsdt: 100 }));
+    expect(loadHolds()).toHaveLength(1);
+    const out = await payInvoice(invoice, deps(ex, textileReplying("103500000", "150000000000").fn, { approvedUsdt: 104.6 }));
+    expect(out.status).toBe("paid");
+    expect(loadHolds()).toEqual([]);
   });
 
   it("refuses a quote that points at another contract", async () => {

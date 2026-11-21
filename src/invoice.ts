@@ -23,6 +23,8 @@ export type ReadInvoice = {
   fingerprint: Hex;
   /** Things worth flagging, e.g. a wallet address written on the invoice. */
   notes: string[];
+  /** Wallet addresses written on the invoice. Shown to the client, never paid. */
+  addresses: string[];
   source: "json" | "ai";
 };
 
@@ -66,18 +68,20 @@ function addressNotes(text: string): string[] {
     : [];
 }
 
+const addressesIn = (text: string) => [...new Set(text.match(ADDRESS_RE) ?? [])];
+
 export async function readInvoice(path: string, extractWithAi?: (redactedText: string) => Promise<Invoice>): Promise<ReadInvoice> {
   const bytes = readFileSync(path);
   const text = bytes.toString("utf8");
   const fp = fingerprint(new Uint8Array(bytes));
   if (extname(path).toLowerCase() === ".json") {
-    return { invoice: validateInvoice(JSON.parse(text)), fingerprint: fp, notes: addressNotes(text), source: "json" };
+    return { invoice: validateInvoice(JSON.parse(text)), fingerprint: fp, notes: addressNotes(text), addresses: addressesIn(text), source: "json" };
   }
   if (!extractWithAi) {
     throw new Error("This invoice is plain text. Set ANTHROPIC_API_KEY so the agent can read it, or use the JSON format.");
   }
   const invoice = validateInvoice(await extractWithAi(redact(text)));
-  return { invoice, fingerprint: fp, notes: addressNotes(text), source: "ai" };
+  return { invoice, fingerprint: fp, notes: addressNotes(text), addresses: addressesIn(text), source: "ai" };
 }
 
 /**

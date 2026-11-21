@@ -37,6 +37,8 @@ export function attributionCode(): string {
 }
 
 export const settings = {
+  /** First name to greet the client with on the website. Optional. */
+  clientName: () => opt("CLIENT_NAME"),
   rpcUrl: () => opt("CELO_RPC_URL") ?? DEFAULT_RPC_URL,
   textileUrl: () => opt("TEXTILE_API_URL") ?? TEXTILE_API_URL,
   textileKey: () => opt("TEXTILE_API_KEY"),

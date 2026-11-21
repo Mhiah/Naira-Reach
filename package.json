@@ -11,7 +11,9 @@
     "naira-reach": "./src/cli.ts"
   },
   "scripts": {
+    "app": "node src/server.ts",
     "reach": "node src/cli.ts",
+    "build:web": "esbuild src/browser/receive.ts --bundle --format=iife --minify --target=es2020 --platform=browser --legal-comments=none --outfile=web/vendor/receive.js",
     "typecheck": "tsc --noEmit",
     "test": "vitest run"
   },
@@ -24,6 +26,7 @@
   },
   "devDependencies": {
     "@types/node": "^26.6.6",
+    "esbuild": "^0.28.2",
     "typescript": "^7.0.2",
     "vitest": "^5.1.1"
   }

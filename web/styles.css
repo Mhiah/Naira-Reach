@@ -198,7 +198,7 @@ td .sub { display: block; font-size: var(--fs-small); color: var(--color-muted);
 .input, textarea.input {
   font: inherit; color: var(--color-text);
   background: var(--color-bg); border: 1px solid var(--color-border); border-radius: var(--radius-button);
-  min-height: 44px; padding: 10px var(--s3); width: 100%;
+  min-height: 44px; padding: 10px var(--s3); width: 100%; line-height: 24px;
 }
 .input::placeholder { color: var(--color-muted); }
 .input:focus { outline: none; box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-primary) 22%, transparent); border-color: var(--color-primary); }
@@ -224,7 +224,7 @@ td .sub { display: block; font-size: var(--fs-small); color: var(--color-muted);
 /* ---------- Chart ---------- */
 .chart { display: flex; flex-direction: column; }
 .chart .plot { flex: 1; min-height: 220px; display: flex; flex-direction: column; gap: var(--s2); }
-.chart svg { width: 100%; flex: 1; min-height: 200px; display: block; }
+.chart .plot svg { width: 100%; flex: 1; min-height: 200px; display: block; }
 .chart .ticks { display: flex; justify-content: space-between; font-family: var(--font-mono); font-variant-numeric: tabular-nums; font-size: 11px; color: var(--color-muted); }
 .legend { display: flex; gap: var(--s4); font-size: var(--fs-small); color: var(--color-muted); }
 .legend i { display: inline-block; width: 14px; height: 2px; vertical-align: middle; margin-right: 6px; background: var(--color-primary); }
@@ -255,3 +255,39 @@ td .sub { display: block; font-size: var(--fs-small); color: var(--color-muted);
   .page-head .actions { width: 100%; }
   .page-head .actions .btn { flex: 1; }
 }
+
+/* ---------- States: loading, empty, disabled, notices ---------- */
+.btn[disabled] { opacity: .45; cursor: not-allowed; filter: none; }
+.btn-link {
+  background: none; border: 0; padding: 0; font: inherit; font-size: var(--fs-small); color: var(--color-text);
+  text-decoration: underline; text-underline-offset: 3px; cursor: pointer;
+}
+.empty { flex: 1; justify-content: center; text-align: center; padding: var(--s8) var(--s4); display: flex; flex-direction: column; align-items: center; gap: var(--s3); color: var(--color-muted); }
+.empty svg { width: 28px; height: 28px; }
+.empty p { margin: 0 auto; }
+.callout.neutral { background: var(--tint-secondary); }
+.callout.neutral svg { color: var(--color-secondary); }
+.callout code, .checks code { font-family: var(--font-mono); font-size: 14px; background: var(--color-bg); border: 1px solid var(--color-border); border-radius: 6px; padding: 1px 6px; word-break: break-all; }
+.drop.over { border-color: var(--color-accent); background: var(--tint-accent); }
+.checks .ico.todo { background: transparent; border: 1.5px solid var(--color-border); color: var(--color-muted); font-family: var(--font-mono); font-size: 12px; }
+.checks .step-action { margin-top: var(--s2); }
+.check-line { display: flex; gap: var(--s3); align-items: flex-start; font-size: 15px; cursor: pointer; }
+.check-line input { width: 18px; height: 18px; margin: 3px 0 0; accent-color: var(--color-primary); flex: none; }
+tr.pick { cursor: pointer; }
+tr.pick:hover td, tr.picked td { background: var(--tint-primary); }
+.spinner { width: 16px; height: 16px; border: 2px solid currentColor; border-right-color: transparent; border-radius: 999px; animation: spin .8s linear infinite; flex: none; }
+@keyframes spin { to { transform: rotate(360deg); } }
+.loading { display: flex; align-items: center; gap: var(--s3); color: var(--color-muted); padding: var(--s8) 0; }
+.hint { font-size: var(--fs-small); color: var(--color-muted); }
+.form-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--space-gap); }
+.form-grid .wide { grid-column: 1 / -1; }
+.result-ok .ico { background: var(--color-primary); }
+.toast {
+  position: fixed; left: 50%; bottom: var(--s6); z-index: 10; max-width: calc(100vw - 32px);
+  transform: translate(-50%, 12px); opacity: 0; pointer-events: none;
+  background: var(--color-primary); color: var(--color-on-primary); border-radius: var(--radius-button);
+  padding: var(--s3) var(--s5); font-size: 15px; box-shadow: var(--shadow-card);
+  transition: opacity .2s ease, transform .2s ease;
+}
+.toast.show { opacity: 1; transform: translate(-50%, 0); }
+@media (max-width: 900px) { .form-grid { grid-template-columns: 1fr; } }

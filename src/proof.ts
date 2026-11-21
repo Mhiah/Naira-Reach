@@ -58,6 +58,12 @@ export function saveStoredProof(proof: TakerProof & { taker: Address; chainId: n
   writeJson(PROOF_FILE(), proof, true);
 }
 
+/** When the stored proof was signed and for which wallet, without handing out the proof. */
+export function storedProofInfo(): { taker: Address; issuedAt: number; validUntil: number } | undefined {
+  const p = readJson<(TakerProof & { taker: Address }) | null>(PROOF_FILE(), null);
+  return p ? { taker: p.taker, issuedAt: p.issuedAt, validUntil: p.issuedAt + STORED_PROOF_MAX_AGE_MS } : undefined;
+}
+
 /** The client's stored proof for the Altana wallet, if it is still fresh. */
 export function loadStoredProof(taker: Address, chainId: number, now = Date.now()): TakerProof {
   const p = readJson<(TakerProof & { taker: Address; chainId: number }) | null>(PROOF_FILE(), null);

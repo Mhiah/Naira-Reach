@@ -4,7 +4,19 @@
 //   → report → receipt.
 import { erc20Abi, encodeFunctionData, formatUnits, getAddress, parseAbi, parseUnits, type Address, type Hex, type PublicClient } from "viem";
 import { CELO_CHAIN_ID, DECIMALS, EXPLORER_TX, TEXTILE_REACTOR, TOKENS } from "./celo.ts";
-import { checkCost, checkInvoice, loadFreelancers, loadLedger, recordPaid, type Freelancer } from "./checks.ts";
+import {
+  checkCost,
+  checkInvoice,
+  clearHold,
+  firstName,
+  holdsOf,
+  loadFreelancers,
+  loadLedger,
+  recordHold,
+  recordPaid,
+  type CheckRow,
+  type Freelancer,
+} from "./checks.ts";
 import { receiptsDir, writeJson } from "./config.ts";
 import type { Call, Executor } from "./executor.ts";
 import { readInvoice, type Invoice } from "./invoice.ts";
@@ -28,6 +40,11 @@ export type PayDeps = {
   extractor?: (redactedText: string) => Promise<Invoice>;
   /** Pay even if a check raised a hold (the client has looked and approved). */
   approveHolds?: boolean;
+  /**
+   * The most the client agreed to pay, in USD₮, after seeing the indicative price.
+   * A firm quote above it is held, whatever approveHolds says.
+   */
+  approvedUsdt?: number;
   dryRun?: boolean;
   log?: (line: string) => void;
 };
@@ -65,11 +82,26 @@ export async function payInvoice(invoicePath: string, d: PayDeps): Promise<PayOu
   const { invoice, fingerprint, notes } = await readInvoice(invoicePath, d.extractor);
   log(`Invoice ${invoice.invoiceId} from ${invoice.freelancer}: ₦${invoice.amountNgn.toLocaleString("en-NG")}`);
 
+  // Every stop on a real run is written down, so the client can see what the agent refused.
+  const held = (holds: string[]): PayOutcome => {
+    if (!d.dryRun) {
+      recordHold({
+        invoiceId: invoice.invoiceId,
+        fingerprint,
+        billedBy: invoice.freelancer,
+        amountNgn: invoice.amountNgn,
+        reasons: holds,
+        heldAt: new Date().toISOString(),
+      });
+    }
+    return { status: "held", holds, notes };
+  };
+
   // 2. Checks that need no money: approved freelancer, duplicates, agreed amount.
   const check = checkInvoice(invoice, fingerprint, loadFreelancers(), loadLedger());
-  if (check.holds.length && !d.approveHolds) return { status: "held", holds: check.holds, notes };
+  if (check.holds.length && !d.approveHolds) return held(check.holds);
   const freelancer = check.freelancer;
-  if (!freelancer) return { status: "held", holds: check.holds, notes };
+  if (!freelancer) return held(check.holds);
 
   // 3. A fresh private address for this payout only.
   const payout = newStealthAddress(freelancer.metaAddress);
@@ -82,7 +114,7 @@ export async function payInvoice(invoicePath: string, d: PayDeps): Promise<PayOu
     const p = await d.textile.preview({ chainId: CELO_CHAIN_ID, sellToken: TOKENS.USDT, buyToken: TOKENS.CNGN, buyAmount });
     const usdtCost = Number(formatUnits(BigInt(p.takerPays), DECIMALS.USDT));
     const costHolds = checkCost(usdtCost, d.maxUsdt);
-    if (costHolds.length && !d.approveHolds) return { status: "held", holds: costHolds, notes };
+    if (costHolds.length && !d.approveHolds) return held(costHolds);
     const steps = ["approve", "swap", "payout", ...(gasTopUp > 0n ? ["gas money"] : []), ...(d.announcer ? ["announce"] : [])];
     return {
       status: "planned",
@@ -109,9 +141,14 @@ export async function payInvoice(invoicePath: string, d: PayDeps): Promise<PayOu
   const ngnPerUsdt = invoice.amountNgn / usdtCost;
   log(`Quote ${quote.rfqId}: ${usdtCost.toFixed(4)} USD₮ for ₦${invoice.amountNgn.toLocaleString("en-NG")} (₦${ngnPerUsdt.toFixed(2)} per USD₮)`);
 
-  // 5. The client's per-invoice dollar ceiling.
+  // 5. The client's per-invoice dollar ceiling, and the price they approved.
   const costHolds = checkCost(usdtCost, d.maxUsdt);
-  if (costHolds.length && !d.approveHolds) return { status: "held", holds: costHolds, notes };
+  if (costHolds.length && !d.approveHolds) return held(costHolds);
+  if (d.approvedUsdt !== undefined && usdtCost > d.approvedUsdt) {
+    return held([
+      `The price moved: it now costs ${usdtCost.toFixed(2)} USD₮ and you approved up to ${d.approvedUsdt.toFixed(2)} USD₮. Nothing was sent.`,
+    ]);
+  }
 
   // 6. Build the calls. With Altana they run as one atomic intent: all or nothing.
   const allowance = await d.reader.readContract({
@@ -156,7 +193,116 @@ export async function payInvoice(invoicePath: string, d: PayDeps): Promise<PayOu
     paidAt: new Date().toISOString(),
     receipt: receiptPath,
   });
+  clearHold(fingerprint);
   return { status: "paid", plan, receiptPath, hashes: sent.hashes, tags, notes };
+}
+
+// ---------- review: everything the client sees before approving ----------
+
+export type ReviewDeps = {
+  textile: TextileClient;
+  extractor?: (redactedText: string) => Promise<Invoice>;
+  maxUsdt: number;
+  gasTopUpUsdt: number;
+  /** What the agent's key may still spend this week. Undefined when the agent has no key. */
+  weekLeft?: { usdt: number; cngn: number };
+};
+
+export type Review = {
+  invoice: Invoice;
+  fingerprint: Hex;
+  source: "json" | "ai";
+  freelancer?: Freelancer;
+  rows: CheckRow[];
+  holds: string[];
+  /** True when every hold is one the client may look at and pay anyway. */
+  canOverride: boolean;
+  price?: { usdtCost: number; ngnPerUsdt: number; feeUsdt: number; gasMoneyUsdt: number };
+};
+
+/**
+ * Read and check an invoice and price it, without a wallet and without sending
+ * anything. This is what the client approves; payInvoice then repeats every check.
+ */
+export async function reviewInvoice(invoicePath: string, d: ReviewDeps): Promise<Review> {
+  const read = await readInvoice(invoicePath, d.extractor);
+  const { invoice, fingerprint } = read;
+  const check = checkInvoice(invoice, fingerprint, loadFreelancers(), loadLedger());
+  const rows = [...check.rows];
+  const freelancer = check.freelancer;
+  let price: Review["price"];
+
+  if (freelancer) {
+    try {
+      const buyAmount = parseUnits(String(invoice.amountNgn), DECIMALS.CNGN);
+      const p = await d.textile.preview({ chainId: CELO_CHAIN_ID, sellToken: TOKENS.USDT, buyToken: TOKENS.CNGN, buyAmount });
+      const usdtCost = Number(formatUnits(BigInt(p.takerPays), DECIMALS.USDT));
+      price = {
+        usdtCost,
+        ngnPerUsdt: invoice.amountNgn / usdtCost,
+        feeUsdt: Number(formatUnits(BigInt(p.feeAmount || "0"), DECIMALS.USDT)),
+        gasMoneyUsdt: d.gasTopUpUsdt,
+      };
+    } catch (e) {
+      rows.push({ ok: false, title: "No price from Textile", note: (e as Error).message, hold: "block", setup: true });
+    }
+  }
+
+  if (price) {
+    const over = checkCost(price.usdtCost, d.maxUsdt);
+    rows.push(
+      over.length
+        ? { ok: false, title: "Over your per-invoice limit", note: over[0]!, hold: "review" }
+        : { ok: true, title: "Within your per-invoice limit", note: `About ${price.usdtCost.toFixed(2)} USD₮ of your ${d.maxUsdt} USD₮ limit` },
+    );
+    const total = price.usdtCost + price.gasMoneyUsdt;
+    if (!d.weekLeft) {
+      rows.push({
+        ok: false,
+        title: "The agent has no key yet",
+        note: "Give the agent a key on Agent access before paying.",
+        hold: "block",
+        setup: true,
+      });
+    } else if (total <= d.weekLeft.usdt && invoice.amountNgn <= d.weekLeft.cngn) {
+      rows.push({
+        ok: true,
+        title: "Within the agent's weekly limits",
+        note: `Uses about ${total.toFixed(2)} of the ${d.weekLeft.usdt.toFixed(2)} USD₮ left this week`,
+      });
+    } else {
+      rows.push({
+        ok: false,
+        title: "Over the agent's weekly limits",
+        note: "The wallet would refuse this payment. Raise the limits on Agent access.",
+        hold: "block",
+        setup: true,
+      });
+    }
+  }
+
+  for (const a of read.addresses) {
+    rows.push({
+      ok: false,
+      ignored: true,
+      title: "Wallet address written on the invoice",
+      note: freelancer
+        ? `${a.slice(0, 6)}…${a.slice(-4)} was ignored. ${firstName(freelancer.name)} is paid at their private code only.`
+        : `${a.slice(0, 6)}…${a.slice(-4)} was ignored. Naira Reach never pays an address written on an invoice.`,
+    });
+  }
+
+  const holds = holdsOf(rows);
+  return {
+    invoice,
+    fingerprint,
+    source: read.source,
+    freelancer,
+    rows,
+    holds,
+    canOverride: holds.length > 0 && rows.every((r) => r.hold !== "block"),
+    price,
+  };
 }
 
 export function assertQuote(q: FirmQuote, taker: Address, buyAmount: bigint): void {

@@ -11,7 +11,7 @@ import {
   type SerializedSession,
   type Session,
 } from "@altananetwork/sdk";
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, renameSync } from "node:fs";
 import { parseUnits, type Address, type Hex } from "viem";
 import { generatePrivateKey, privateKeyToAccount } from "viem/accounts";
 import { CELO_CHAIN_ID, DECIMALS, TEXTILE_REACTOR, TOKENS } from "./celo.ts";
@@ -69,12 +69,18 @@ function altana() {
   return createClient({ chains: [CELO], agentIdentity: AGENT_IDENTITY });
 }
 
+/** What this computer knows about the client's wallet. No keys. */
+export type ClientRecord = { walletAddress?: Address; activatedAt?: string; activationTx?: Hex; agentId?: string };
+
+export const loadClientRecord = () => readJson<ClientRecord>(CLIENT_FILE(), {});
+const saveClientRecord = (patch: ClientRecord) => writeJson(CLIENT_FILE(), { ...loadClientRecord(), ...patch });
+
 /** Step 1 (client): create the wallet and make its first action, which also registers its ERC-8004 identity. */
 export async function setupClientWallet(adminKey: Hex) {
   const client = altana();
   const signer = signerFromPrivateKey(adminKey);
   const wallet = await client.createWallet({ signer });
-  writeJson(CLIENT_FILE(), { walletAddress: wallet.address });
+  saveClientRecord({ walletAddress: wallet.address });
   return { client, wallet, signer };
 }
 
@@ -86,6 +92,13 @@ export async function activateClientWallet(adminKey: Hex) {
     calls: { to: wallet.address, value: 0n },
     feeToken: FEE_TOKENS,
   });
+  if (result.status === "CONFIRMED") {
+    saveClientRecord({
+      activatedAt: new Date().toISOString(),
+      activationTx: result.transactionHash,
+      ...(result.agentIdentity?.status === "registered" ? { agentId: result.agentIdentity.agentId } : {}),
+    });
+  }
   return { wallet: wallet.address, result };
 }
 
@@ -132,11 +145,24 @@ export async function refreshTakerProof(adminKey: Hex) {
 export async function revokeAgentSession(adminKey: Hex) {
   const { client, wallet, signer } = await setupClientWallet(adminKey);
   const session = loadAgentSession();
-  return client.revokeSession({ wallet, signer, session, feeToken: FEE_TOKENS });
+  const result = await client.revokeSession({ wallet, signer, session, feeToken: FEE_TOKENS });
+  if (result.status === "revoked" || result.status === "CONFIRMED") {
+    // The key is dead on-chain. Move it out of the way so nothing tries to use it again.
+    const dir = statePath(`revoked/${Date.now()}`);
+    mkdirSync(dir, { recursive: true });
+    renameSync(SESSION_FILE(), `${dir}/session.json`);
+    renameSync(SESSION_KEY_FILE(), `${dir}/session.key`);
+  }
+  return result;
 }
 
 export function hasAgentSession(): boolean {
   return existsSync(SESSION_FILE()) && existsSync(SESSION_KEY_FILE());
+}
+
+/** The stored half of the session (limits and expiry, no key), for showing the client. */
+export function storedSession(): SerializedSession | undefined {
+  return hasAgentSession() ? (readJson<SerializedSession | null>(SESSION_FILE(), null) ?? undefined) : undefined;
 }
 
 /** The agent's side: rebuild the live session from local state. */
@@ -151,5 +177,5 @@ export function loadAgentSession(): Session {
 }
 
 export function clientWalletAddress(): Address | undefined {
-  return readJson<{ walletAddress?: Address }>(CLIENT_FILE(), {}).walletAddress;
+  return loadClientRecord().walletAddress;
 }

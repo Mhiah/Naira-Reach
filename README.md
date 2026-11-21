@@ -61,6 +61,7 @@ Before any money moves, the agent runs these checks. A failed check is a **hold*
 | Private payouts | Makes the freelancer's receiving code, derives a fresh address per invoice, and lets the freelancer open it later. |
 | Attribution | Adds the Loops House code to every transaction (ERC-8021) and checks it is readable onchain. |
 | Receipts | One file per payment: amount, rate, transaction links, the invoice fingerprint, and what the freelancer needs to open the payout. No personal details. |
+| Website | One site with two sides. **Send** runs the agent on the client's own computer. **Receive** runs entirely in the freelancer's browser, so their keys never leave it. |
 
 ---
 
@@ -133,7 +134,22 @@ Fill in `.env`. At minimum: `ATTRIBUTION_CODE`. A Textile API key is optional: w
 
 On Windows PowerShell, type `npm.cmd` where this README says `npm`, or run commands directly with `node src/cli.ts <command>`.
 
-### 2. See what is set up
+### 2. The easy way: open the website
+
+```bash
+npm run app
+```
+
+Then open http://localhost:8787 and keep the terminal open while you use it.
+
+- **Send** is the client's side. The Overview lists every set-up step with a tick or the next thing to do: attribution code, wallet key, USD₮ in the wallet, wallet activation, the agent's key, and a freelancer on the list. Pay an invoice shows each check and the price before anything moves. You approve the price, the agent locks a firm quote, and if the firm price is more than 1% above what you approved, nothing is sent.
+- **Receive** is the freelancer's side. Make a receiving code, back it up, open a receipt from the client, and move the naira. It works the same with or without the agent running, so a freelancer can use it on their own device.
+
+The site only listens on this computer. Other websites can't use it: it checks where every request comes from, and each run has its own key that only the page it serves knows.
+
+Everything below can also be done from the command line.
+
+### 3. See what is set up
 
 ```bash
 npm run reach -- check
@@ -141,9 +157,11 @@ npm run reach -- check
 
 Result: a checklist with ✓ for what is ready and ✗ with the next step for what is not.
 
-### 3. Freelancer: make a receiving code
+### 4. Freelancer: make a receiving code
 
-On the freelancer's own device:
+On the website: **Receive → Receiving code → Make my receiving code**, then **Back up my keys**.
+
+Or on the freelancer's own device:
 
 ```bash
 npm run reach -- freelancer keys
@@ -151,7 +169,7 @@ npm run reach -- freelancer keys
 
 Result: a line starting `st:celo:0x…`. That is safe to share. The keys behind it stay on the device in `.naira-reach/freelancer-keys.json`. Back that file up: without it, payouts cannot be opened.
 
-### 4. Client: set up the wallet
+### 5. Client: set up the wallet
 
 On the client's device. First make the wallet's key. It is written straight into `.env` and never shown:
 
@@ -167,7 +185,7 @@ npm run reach -- wallet setup
 
 Result: the Altana wallet address and its ERC-8004 agent id. Send USD₮ to that address. Altana's relay pays itself in USD₮ when it accepts it and in CELO otherwise, so keep a little CELO there too until the first payment shows which one it took.
 
-### 5. Client: give the agent a limited key
+### 6. Client: give the agent a limited key
 
 ```bash
 npm run reach -- session grant --usdt-per-week 200 --cngn-per-week 300000 --days 7
@@ -177,13 +195,13 @@ Result: `Granted. Expires …`
 
 The grant also signs Textile's wallet proof, so the agent can get quotes without an API key. That proof lasts about 11 hours. After that, the client runs `npm run reach -- proof refresh`.
 
-### 6. Client: approve the freelancer
+### 7. Client: approve the freelancer
 
 ```bash
 npm run reach -- freelancer add --id ada --name "Ada Obi" --meta st:celo:0x… --max 500000
 ```
 
-### 7. Agent: pay an invoice
+### 8. Agent: pay an invoice
 
 Try a dry run first. It reads and checks the invoice, gets an indicative price from Textile's preview, and picks a fresh payout address. It reserves nothing, sends nothing, and needs no wallet:
 
@@ -207,13 +225,13 @@ To see the AI reader and the fraud flag together, try the plain-text invoice. It
 npm run reach -- pay examples/invoice.txt --dry-run
 ```
 
-### 8. Freelancer: move the naira
+### 9. Freelancer: move the naira
 
 ```bash
 npm run reach -- freelancer claim receipts/INV-2026-014-….json --to 0xYourWalletOrExchangeDeposit
 ```
 
-### 9. Client: take the key back
+### 10. Client: take the key back
 
 ```bash
 npm run reach -- session revoke
@@ -259,6 +277,8 @@ Naira Reach keeps the freelancer's income private from the public. It does not h
 - **cNGN is not a Celo gas token.** That is why each payout carries a few cents of USD₮, so the freelancer can move the naira without buying CELO.
 - **The receipt matters.** The freelancer needs the receipt to open a payout. An optional ERC-5564 announcer would let them find payouts from the chain alone, but there is no announcer deployed on Celo today.
 - **Cashing out.** cNGN is listed on Nigerian exchanges such as Busha and Quidax. Check that the one you use accepts cNGN on Celo.
+- **Receiving keys on the website live in the browser.** Clearing the browser's data removes them, which is why the site asks for a backup first. The backup file opens every payout, so it needs to be kept private.
+- **The weekly limit shown is counted from this computer's records.** The wallet enforces the real limit onchain. A payment made from somewhere else would not show in the figure.
 - **The agent's USD₮ transfer permission is broad.** It exists only to send gas money to the payout address, and the weekly cap limits it.
 
 ---
@@ -267,7 +287,7 @@ Naira Reach keeps the freelancer's income private from the public. It does not h
 
 - First live payments for a real client and freelancer, with links in Results
 - An announcer contract on Celo, so freelancers can find payouts without receipts
-- A simple page where a freelancer pastes a receipt and claims, with no terminal needed
+- The Receive side hosted online, so a freelancer needs nothing installed
 - Recurring invoices: retainers paid on a schedule within the same session limits
 
 ---
@@ -278,6 +298,7 @@ Naira Reach keeps the freelancer's income private from the public. It does not h
 
 | Command | Who runs it | What it does |
 |---|---|---|
+| `npm run app` | Client | Opens the website at http://localhost:8787 with the agent behind it |
 | `check` | Anyone | Shows what is set up and what is missing |
 | `wallet new-key` | Client | Makes the wallet key and saves it in `.env` without showing it |
 | `wallet setup` | Client | Creates and activates the Altana wallet; registers the ERC-8004 identity |
@@ -303,6 +324,8 @@ Naira Reach keeps the freelancer's income private from the public. It does not h
 | `GAS_TOP_UP_USDT` | Paying | Gas money per payout, default 0.05 |
 | `CELO_RPC_URL` | Everything | Defaults to the public Celo RPC |
 | `STEALTH_ANNOUNCER_ADDRESS` | Optional | ERC-5564 announcer, if one is deployed |
+| `CLIENT_NAME` | Optional | First name the website greets the client with |
+| `NAIRA_REACH_PORT` | Optional | Port for the website, default 8787 |
 | `DIRECT_WALLET_PRIVATE_KEY` | `--direct` only | Optional. Without it, `--direct` sends from the client's own wallet key, the same address as the Altana wallet |
 
 ### Invoice format
@@ -343,7 +366,12 @@ Sources: the Textile FX address book, Celo's fee currency list, and the Altana S
 | `src/altana.ts` | Client wallet and the agent's session key |
 | `src/executor.ts` | Sending through Altana (atomic) or a plain wallet |
 | `src/stealth.ts` | Private payout addresses (ERC-5564 scheme 1) |
-| `src/claim.ts` | The freelancer's claim |
+| `src/claim.ts` | The freelancer's claim from the command line |
+| `src/move.ts` | Moving a payout, shared by the command line and the website |
+| `src/web.ts` | The website's link to the agent, and the checks that keep other sites out |
+| `src/server.ts` | Starts the website (`npm run app`) |
+| `src/browser/receive.ts` | The Receive side's keys and claims, bundled into `web/vendor/receive.js` |
+| `web/` | The website: one page, plain JavaScript, no build step to run it |
 | `src/tag.ts` | ERC-8021 attribution tags |
 | `src/cli.ts` | The command line |
 | `test/` | Tests |
