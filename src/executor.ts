@@ -8,7 +8,7 @@ import { createClient as createAltanaClient, CELO, NATIVE_TOKEN, type Session } 
 import { createPublicClient, createWalletClient, http, type Address, type Hex, type PublicClient } from "viem";
 import { privateKeyToAccount, type PrivateKeyAccount } from "viem/accounts";
 import { celo } from "viem/chains";
-import { TOKENS } from "./celo.ts";
+import { TOKENS, USDT_FEE_CURRENCY } from "./celo.ts";
 import { loadStoredProof, signTakerProof, type TakerProof } from "./proof.ts";
 import { tagCalldata } from "./tag.ts";
 
@@ -78,7 +78,13 @@ export class DirectExecutor implements Executor {
   async send(calls: Call[]): Promise<SendResult> {
     const hashes: Hex[] = [];
     for (const c of calls) {
-      const hash = await this.wallet.sendTransaction({ to: c.to, data: tagCalldata(c.data, this.code), value: c.value ?? 0n });
+      const hash = await this.wallet.sendTransaction({
+        to: c.to,
+        data: tagCalldata(c.data, this.code),
+        value: c.value ?? 0n,
+        // Pay gas in USD₮ (Celo fee abstraction), so the wallet needs no CELO.
+        feeCurrency: USDT_FEE_CURRENCY,
+      });
       hashes.push(hash);
       const receipt = await this.reader.waitForTransactionReceipt({ hash, timeout: 180_000 });
       if (receipt.status !== "success") return { hashes, status: "FAILED" };
