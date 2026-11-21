@@ -292,3 +292,38 @@ describe("invoices", () => {
 });
 
 void dir;
+
+describe("moving the agent to the online site", () => {
+  beforeEach(() => start());
+
+  it("locks the agent into a file that only the password opens, with the wallet key inside", async () => {
+    process.env.CLIENT_ADMIN_PRIVATE_KEY = "0x" + "4c".repeat(32);
+    seedSession(200, 300_000);
+    saveFreelancers([ada()]);
+    const short = await call("POST", "/api/export", { body: { password: "short", repeat: "short" } });
+    expect(short.status).toBe(400);
+    const mismatch = await call("POST", "/api/export", { body: { password: "a long password", repeat: "a long passw0rd" } });
+    expect(mismatch.json().error).toContain("don't match");
+
+    const r = await call("POST", "/api/export", { body: { password: "a long password", repeat: "a long password" } });
+    expect(r.status).toBe(200);
+    expect(r.text).not.toContain("4c4c4c4c");
+    expect(r.text).not.toContain("Ada Obi");
+    const { open } = await import("../src/vault.ts");
+    const { value } = await open<{ records: Record<string, any> }>(r.json(), "a long password");
+    expect(value.records["admin.key"].privateKey).toBe("0x" + "4c".repeat(32));
+    expect(value.records["session.key"].privateKey).toBe("0x" + "11".repeat(32));
+    expect(value.records["freelancers.json"][0].name).toBe("Ada Obi");
+    await expect(open(r.json(), "the wrong password")).rejects.toThrow("doesn't open");
+  });
+
+  it("refuses to export from another website", async () => {
+    const r = await call("POST", "/api/export", { body: { password: "a long password", repeat: "a long password" }, headers: { origin: "https://evil.test" } });
+    expect(r.status).toBe(403);
+  });
+
+  it("doesn't serve the online site's helpers on this computer", async () => {
+    expect((await call("GET", "/api/textile.mjs")).status).toBe(404);
+    expect((await call("GET", "/vercel.json")).status).toBe(404);
+  });
+});

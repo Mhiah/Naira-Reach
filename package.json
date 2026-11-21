@@ -13,7 +13,7 @@
   "scripts": {
     "app": "node src/server.ts",
     "reach": "node src/cli.ts",
-    "build:web": "esbuild src/browser/receive.ts --bundle --format=iife --minify --target=es2020 --platform=browser --legal-comments=none --outfile=web/vendor/receive.js",
+    "build:web": "esbuild src/browser/receive.ts src/browser/send.ts --bundle --format=iife --minify --target=es2020 --platform=browser --legal-comments=none --outdir=web/vendor",
     "typecheck": "tsc --noEmit",
     "test": "vitest run"
   },

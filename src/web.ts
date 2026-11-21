@@ -13,7 +13,9 @@ import type { PublicClient } from "viem";
 import { AgentError, createAgent, type Actions, type Json } from "./agent.ts";
 import { attributionCode, privateKey, settings } from "./config.ts";
 import { anthropicExtractor } from "./invoice.ts";
+import { store } from "./store.ts";
 import type { TextileClient } from "./textile.ts";
+import { newVaultKey, seal } from "./vault.ts";
 
 export type { Actions } from "./agent.ts";
 
@@ -50,6 +52,9 @@ const TYPES: Record<string, string> = {
 
 const MAX_BODY = 2 * 1024 * 1024;
 
+/** What moves to the online site. Uploaded invoices and revoked keys stay behind. */
+const EXPORTED = ["client.json", "session.json", "session.key", "taker-proof.json", "freelancers.json", "ledger.json", "holds.json"];
+
 const code = () => {
   try {
     return attributionCode();
@@ -79,6 +84,23 @@ export function createWebApp(o: WebOptions) {
     actions: o.actions,
     now: o.now,
   });
+
+  /**
+   * The agent in a locked file, for the online site's "Bring your agent from
+   * your laptop". Locked with the client's password before it leaves this server.
+   */
+  async function exportAgent(body: Record<string, unknown>) {
+    const password = String(body.password ?? "");
+    if (password !== String(body.repeat ?? "")) throw new HttpError(400, "The two passwords don't match.");
+    const records: Record<string, unknown> = {};
+    for (const name of EXPORTED) if (store().exists(name)) records[name] = store().read(name, null);
+    for (const name of store().list("receipts/")) if (name.endsWith(".json")) records[name] = store().read(name, null);
+    records["admin.key"] = { privateKey: privateKey("CLIENT_ADMIN_PRIVATE_KEY", "There's no wallet key on this computer to move.") };
+    const clientName = settings.clientName();
+    if (clientName) records["profile.json"] = { clientName };
+    const vk = await newVaultKey(password);
+    return seal({ v: 1, exportedAt: new Date().toISOString(), records }, vk);
+  }
 
   function serveStatic(url: URL, res: ServerResponse) {
     let rel = decodeURIComponent(url.pathname);
@@ -119,6 +141,7 @@ export function createWebApp(o: WebOptions) {
         }
       }
       const body = req.method === "POST" ? await readBody(req) : {};
+      if (req.method === "POST" && url.pathname === "/api/export") return send(res, 200, await exportAgent(body), rpcOrigin);
       const out: Json = await agent.dispatch(req.method ?? "GET", url.pathname.slice("/api".length), body);
       send(res, 200, out, rpcOrigin);
     } catch (e) {
