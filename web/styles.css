@@ -294,7 +294,7 @@ tr.pick:hover td, tr.picked td { background: var(--tint-primary); }
 
 /* ---------- Guide ---------- */
 .guide-link {
-  align-self: flex-start; margin: 0 0 0 var(--s4);
+  align-self: flex-start; margin: auto 0 0 var(--s4); /* sits at the very bottom of the left bar */
   font-size: 15px; color: var(--color-text); text-decoration: underline; text-underline-offset: 4px;
 }
 .guide-link[aria-current="page"] { font-weight: 700; }
