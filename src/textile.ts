@@ -28,11 +28,15 @@ export type Preview = { takerPays: string; buyAmount: string; feeAmount: string 
 export class TextileError extends Error {}
 
 export class TextileClient {
-  constructor(
-    private readonly baseUrl: string,
-    private readonly apiKey: string | undefined,
-    private readonly fetchFn: typeof fetch = fetch,
-  ) {}
+  private readonly baseUrl: string;
+  private readonly apiKey: string | undefined;
+  private readonly fetchFn: typeof fetch;
+
+  constructor(baseUrl: string, apiKey: string | undefined, fetchFn: typeof fetch = fetch) {
+    this.baseUrl = baseUrl;
+    this.apiKey = apiKey;
+    this.fetchFn = fetchFn;
+  }
 
   private headers(extra: Record<string, string> = {}): Record<string, string> {
     const h: Record<string, string> = { "Content-Type": "application/json", ...extra };

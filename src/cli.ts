@@ -1,4 +1,4 @@
-#!/usr/bin/env -S npx tsx
+#!/usr/bin/env node
 // Naira Reach command line. Run with: npm run reach -- <command>
 import { readFileSync } from "node:fs";
 import { parseArgs } from "node:util";

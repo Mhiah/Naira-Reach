@@ -30,11 +30,12 @@ export class AltanaExecutor implements Executor {
   readonly kind = "altana" as const;
   readonly address: Address;
   private readonly client = createAltanaClient({ chains: [CELO] });
+  private readonly session: Session;
+  private readonly code: string;
 
-  constructor(
-    private readonly session: Session,
-    private readonly code: string,
-  ) {
+  constructor(session: Session, code: string) {
+    this.session = session;
+    this.code = code;
     this.address = session.walletAddress;
   }
 
@@ -54,8 +55,10 @@ export class DirectExecutor implements Executor {
   readonly address: Address;
   private readonly wallet;
   private readonly reader: PublicClient;
+  private readonly code: string;
 
-  constructor(privateKey: Hex, rpcUrl: string, private readonly code: string) {
+  constructor(privateKey: Hex, rpcUrl: string, code: string) {
+    this.code = code;
     const account = privateKeyToAccount(privateKey);
     this.address = account.address;
     this.wallet = createWalletClient({ account, chain: celo, transport: http(rpcUrl) });

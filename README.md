@@ -118,18 +118,20 @@ Freelancer, any time:  freelancer claim receipt.json --to 0x…
 
 ## Try it yourself
 
-You need Node.js 20 or newer.
+You need Node.js 22.18 or newer. Naira Reach runs on Node's built-in TypeScript support, so there is no build step and no extra programs to download.
 
 ### 1. Install
 
 ```bash
 git clone https://github.com/Mhiah/Naira-Reach.git
 cd Naira-Reach
-npm install
+npm install --omit=dev
 cp .env.example .env
 ```
 
 Fill in `.env`. At minimum: `ATTRIBUTION_CODE` and `TEXTILE_API_KEY`.
+
+On Windows PowerShell, type `npm.cmd` where this README says `npm`, or run commands directly with `node src/cli.ts <command>`.
 
 ### 2. See what is set up
 
