@@ -144,11 +144,13 @@ npm run app
 
 Open http://localhost:8787 and keep the terminal open. Closing it stops the agent, so after a restart, run the command again.
 
-The site has two sides, chosen at the top left: **Send** for the client and **Receive** for the freelancer. The site only listens on this computer, and other websites can't use it: it checks where every request comes from, and each run has its own key that only the page it serves knows.
+The site has two sides, chosen at the top left: **Send** for the client and **Receive** for the freelancer. Each side has a **Guide** link in the left bar: the same walkthrough as below, one step at a time, with a picture of each screen and the button to press outlined. The site only listens on this computer, and other websites can't use it: it checks where every request comes from, and each run has its own key that only the page it serves knows.
 
 #### Send: the client's side
 
 1. **Read the set-up list.** The Overview shows six steps, each with a tick or the next thing to do. Every step is done once; when all six are ticked, the list disappears.
+
+   <img src="web/guide/send-2-setup.webp" alt="The set-up list on the Overview" width="640">
 2. **Attribution code.** The code from Loops House enrollment, in `.env` as `ATTRIBUTION_CODE`.
 3. **Wallet key.** `npm run reach -- wallet new-key` writes the key into `.env` and prints only the address. That address is the wallet: an Altana wallet lives at its owner's own key address (EIP-7702).
 4. **Put USD₮ in the wallet.** Step 3 on the Overview has a **Copy address** button. Send **USDT on the Celo network**: Tether's USD₮, contract `0x48065fbBE25f71C9282ddf5e1cD6D6A887483D5e`. Not cUSD or USDC, because Textile's naira pair on Celo is cNGN against USD₮. We started with 5 USD₮ and later topped up to 10.55.
@@ -158,6 +160,8 @@ The site has two sides, chosen at the top left: **Send** for the client and **Re
 8. **Keep Textile's proof fresh.** Giving the key also signs Textile's wallet proof, which lasts about 11 hours. After that, press **Re-sign Textile proof** on Agent access before paying.
 9. **Add a freelancer.** On **Freelancers**, enter their name as it appears on their invoices, any other names they use, a limit per invoice or a fixed amount, and the receiving code they made on the Receive side. Check the code with them on a call before saving.
 10. **Pay an invoice.** Drop the invoice on **Pay an invoice** (`.json`, or `.txt` with `ANTHROPIC_API_KEY` set). The agent shows every check, ignores any wallet address written on the invoice, and prices the exact naira billed. Press **Approve and pay**: you approve up to 1% above the price shown, the agent locks a firm quote, and approve, swap, payout and gas money go through as one transaction. If the firm price is higher, it holds and sends nothing.
+
+    <img src="web/guide/send-8-pay.webp" alt="Pay an invoice: the invoice, the checks and the quote" width="640">
 11. **Send the receipt.** Press **Download receipt** and send the file to the freelancer. It holds what they need to open the payout, and nothing personal.
 12. **Take the key back any time.** **Revoke the agent's key** on Agent access works from the next block.
 
@@ -170,6 +174,8 @@ This side runs entirely in the freelancer's browser, with or without the agent r
 3. **Copy code** and send it to the client. It is not a wallet address, and nobody can use it to look up what you've been paid.
 4. **Open a receipt** on **Payouts** when the client sends one. It only opens if the payout was made to your code.
 5. **Move naira.** Paste your own wallet or an exchange deposit address on Celo, then press **Move naira**. The network fee comes out of the 0.05 USD₮ that arrived with the payout.
+
+   <img src="web/guide/receive-5-move.webp" alt="Moving a payout on the Receive side" width="320">
 6. **Withdraw NGN to bank** through Textile, or through an exchange that accepts cNGN on Celo.
 
 #### What setting up cost us
@@ -418,6 +424,7 @@ Sources: the Textile FX address book, Celo's fee currency list, and the Altana S
 | `src/server.ts` | Starts the website (`npm run app`) |
 | `src/browser/receive.ts` | The Receive side's keys and claims, bundled into `web/vendor/receive.js` |
 | `web/` | The website: one page, plain JavaScript, no build step to run it |
+| `web/guide.js`, `web/guide/` | The Send and Receive guides and their pictures |
 | `src/tag.ts` | ERC-8021 attribution tags |
 | `src/cli.ts` | The command line |
 | `test/` | Tests |

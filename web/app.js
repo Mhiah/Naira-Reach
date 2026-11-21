@@ -753,18 +753,54 @@
     if (route().page === "payouts" && !dirty) render();
   }
 
+  // ---------- Guide (one walkthrough per side) ----------
+  const GUIDES = window.NR_GUIDES || { pay: { steps: [] }, get: { steps: [] } };
+
+  function guide() {
+    const { mode, step } = route();
+    const g = GUIDES[mode];
+    if (!g.steps.length) return `${head({ title: "Guide" })}<section class="card">${callout("The guide didn't load. Reload the page.", "", "flag")}</section>`;
+    const i = step - 1;
+    const s = g.steps[i];
+    const base = `#/${mode}/guide/`;
+    const last = i === g.steps.length - 1;
+    return `${head({ title: g.title, lede: g.lede })}
+    <nav class="guide-steps" aria-label="Steps">${g.steps
+      .map((x, k) => `<a href="${base}${k + 1}" title="${esc(x.title)}" aria-label="Step ${k + 1}: ${esc(x.title)}" ${k === i ? 'aria-current="step"' : ""}>${k + 1}</a>`)
+      .join("")}</nav>
+    <section class="card guide-card ${s.wide ? "wide" : ""}" aria-label="Step ${step}: ${esc(s.title)}">
+      <figure class="guide-shot">
+        <a href="guide/${esc(s.img)}" target="_blank" rel="noopener" title="Open the picture full size"><img src="guide/${esc(s.img)}" srcset="guide/${esc(s.img)} 1.5x" alt="${esc(s.alt)}"></a>
+        <figcaption>${s.plain ? "" : "The outlined button is the one to press. "}Click the picture to see it bigger.</figcaption>
+      </figure>
+      <div class="guide-text stack">
+        <span class="small muted">Step ${step} of ${g.steps.length}</span>
+        <h2>${esc(s.title)}</h2>
+        <p>${s.intro}</p>
+        <ol class="guide-list">${s.steps.map((x) => `<li>${x}</li>`).join("")}</ol>
+        ${s.tip ? callout(s.tip, "neutral") : ""}
+        <div class="row guide-nav">
+          ${i > 0 ? `<a class="btn btn-secondary" href="${base}${step - 1}">Back</a>` : ""}
+          ${last ? `<a class="btn btn-primary" href="#/${mode}/${MENUS[mode][0][0]}">Done</a>` : `<a class="btn btn-primary" href="${base}${step + 1}">Next: ${esc(g.steps[i + 1].title)}</a>`}
+        </div>
+      </div>
+    </section>`;
+  }
+
   // ---------- router ----------
   const MENUS = {
     pay: [["overview", "Overview", "home"], ["invoice", "Pay an invoice", "invoice"], ["freelancers", "Freelancers", "people"], ["access", "Agent access", "key"]],
     get: [["code", "Receiving code", "code"], ["payouts", "Payouts", "inbox"]],
   };
-  const VIEWS = { pay: { overview, invoice: payInvoice, freelancers, access }, get: { code, payouts } };
+  const VIEWS = { pay: { overview, invoice: payInvoice, freelancers, access, guide }, get: { code, payouts, guide } };
 
   function route() {
-    const [, mode = "pay", page] = (location.hash || "#/pay/overview").split("/");
+    const [, mode = "pay", page, sub] = (location.hash || "#/pay/overview").split("/");
     const m = VIEWS[mode] ? mode : "pay";
     const p = VIEWS[m][page] ? page : MENUS[m][0][0];
-    return { mode: m, page: p };
+    const n = (GUIDES[m] && GUIDES[m].steps.length) || 1;
+    const step = Math.min(n, Math.max(1, parseInt(sub, 10) || 1));
+    return { mode: m, page: p, step };
   }
 
   function renderSide(m) {
@@ -789,8 +825,15 @@
     document.querySelectorAll(".mode a").forEach((a) => a.setAttribute("aria-current", String(a.dataset.mode === m)));
     menu.innerHTML = MENUS[m].map(([id, label, ic]) => `<li><a href="#/${m}/${id}" ${id === p ? 'aria-current="page"' : ""}>${icon(ic)}${label}</a></li>`).join("");
     renderSide(m);
-    const title = MENUS[m].find((x) => x[0] === p)[1];
-    if (m === "pay" && !S) {
+    const guideLink = document.getElementById("guide-link");
+    guideLink.href = `#/${m}/guide`;
+    if (p === "guide") guideLink.setAttribute("aria-current", "page");
+    else guideLink.removeAttribute("aria-current");
+    const title = p === "guide" ? GUIDES[m].title || "Guide" : MENUS[m].find((x) => x[0] === p)[1];
+    if (p === "guide") {
+      // The guides need neither the agent nor the keys.
+      view.innerHTML = guide();
+    } else if (m === "pay" && !S) {
       view.innerHTML = CFG.agent && !stateError ? `${head({ title })}${loading("Asking the agent…")}` : agentMissing(title);
     } else if (m === "get" && !R) {
       view.innerHTML = `${head({ title })}<section class="card">${callout("This page's Receive code didn't load. Reload the page.", "", "flag")}</section>`;
@@ -808,6 +851,7 @@
     if (page !== "invoice" && INV && INV.result && !INV.paying) INV = null;
     render();
     if (mode === "pay" && CFG.agent && (!S || Date.now() - SAt > 15000)) {
+      if (page === "guide" && S) return;
       await loadState();
       if (!dirty) render();
     }
