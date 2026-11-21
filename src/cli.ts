@@ -178,7 +178,14 @@ async function pay(argv: string[]) {
   const dryRun = Boolean(values["dry-run"]);
   // A dry run needs no wallet: it prices with Textile's preview and sends nothing.
   const executor: Executor | undefined = values.direct
-    ? new DirectExecutor(privateKey("DIRECT_WALLET_PRIVATE_KEY", "Needed only for --direct."), rpcUrl, code)
+    ? new DirectExecutor(
+        process.env.DIRECT_WALLET_PRIVATE_KEY?.trim()
+          ? privateKey("DIRECT_WALLET_PRIVATE_KEY", "")
+          : // Same address as the Altana wallet (EIP-7702), so the event's agent wallet never changes.
+            privateKey("CLIENT_ADMIN_PRIVATE_KEY", "--direct pays from the client's wallet. Run: wallet new-key"),
+        rpcUrl,
+        code,
+      )
     : dryRun && !hasAgentSession()
       ? undefined
       : new AltanaExecutor(loadAgentSession(), code);

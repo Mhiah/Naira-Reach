@@ -303,7 +303,7 @@ Naira Reach keeps the freelancer's income private from the public. It does not h
 | `GAS_TOP_UP_USDT` | Paying | Gas money per payout, default 0.05 |
 | `CELO_RPC_URL` | Everything | Defaults to the public Celo RPC |
 | `STEALTH_ANNOUNCER_ADDRESS` | Optional | ERC-5564 announcer, if one is deployed |
-| `DIRECT_WALLET_PRIVATE_KEY` | `--direct` only | A plain wallet for testing |
+| `DIRECT_WALLET_PRIVATE_KEY` | `--direct` only | Optional. Without it, `--direct` sends from the client's own wallet key, the same address as the Altana wallet |
 
 ### Invoice format
 
