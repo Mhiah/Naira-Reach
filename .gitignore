@@ -1,0 +1,6 @@
+node_modules/
+.env
+.naira-reach/
+receipts/
+*.log
+.DS_Store

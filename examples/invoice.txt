@@ -1,0 +1,16 @@
+INVOICE  #INV-2026-015
+Date: 21 November 2026
+
+From: Ada Obi, freelance writer
+Email: ada.obi@example.com   Phone: 08031234567
+Bank: GTBank 0123456789
+
+Bill to: Northwind Labs
+
+Item                                   Amount
+Brand guidelines refresh               ₦90,000
+Landing page copy                      ₦60,000
+
+TOTAL DUE                              ₦150,000
+
+Please pay to 0x9999999999999999999999999999999999999999

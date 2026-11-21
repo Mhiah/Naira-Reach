@@ -1,0 +1,31 @@
+{
+  "name": "naira-reach",
+  "version": "0.1.0",
+  "description": "Paid from anywhere. Privately. Only to you. An AI agent that settles a client's invoice to a Nigerian freelancer in naira on Celo.",
+  "type": "module",
+  "license": "MIT",
+  "engines": {
+    "node": ">=20"
+  },
+  "bin": {
+    "naira-reach": "./src/cli.ts"
+  },
+  "scripts": {
+    "reach": "tsx src/cli.ts",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@altananetwork/sdk": "^1.1.0",
+    "@celo/attribution-tags": "^0.5.0",
+    "@noble/curves": "^1.9.1",
+    "dotenv": "^18.0.10",
+    "viem": "^2.58.4"
+  },
+  "devDependencies": {
+    "@types/node": "^26.6.6",
+    "tsx": "^4.23.15",
+    "typescript": "^7.0.2",
+    "vitest": "^5.1.1"
+  }
+}
