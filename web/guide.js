@@ -13,6 +13,7 @@ window.NR_GUIDES = {
         alt: "The Start the agent card, shown when the agent is not running",
         intro: "The Send side runs the agent on your own computer, so your wallet key never leaves it. When the agent isn't running, every Send page shows this card instead.",
         steps: [
+          "The first time, get Naira Reach from <a href=\"https://github.com/Mhiah/Naira-Reach\" target=\"_blank\" rel=\"noopener\">github.com/Mhiah/Naira-Reach</a> and install it with the README's steps.",
           "Open <strong>PowerShell</strong> (on a Mac, <strong>Terminal</strong>).",
           "Go to the project folder: <code>cd path\\to\\Naira-Reach</code>",
           "Run <code>npm.cmd run app</code> (on a Mac: <code>npm run app</code>).",

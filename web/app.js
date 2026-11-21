@@ -172,19 +172,29 @@
   }
 
   function agentMissing(title) {
-    const reason = CFG.agent
-      ? `The agent stopped answering (${esc(stateError)}). Is the window running it still open?`
-      : "The Send side runs the agent on your own computer, so your wallet key never leaves it.";
-    return `${head({ title })}
+    if (CFG.agent) {
+      return `${head({ title })}
     <section class="card stack" aria-label="Start the agent">
-      <div class="card-head" style="margin-bottom:0"><h2>Start the agent</h2>${badge("Not running", "neutral")}</div>
-      <p>${reason}</p>
+      <div class="card-head" style="margin-bottom:0"><h2>Start the agent</h2>${badge("Not answering", "neutral")}</div>
+      <p>The agent stopped answering (${esc(stateError)}). Is the window running it still open?</p>
       <ol class="checks">
         <li><span class="ico todo">1</span><div><div class="strong">Open the Naira-Reach folder in a terminal</div></div><span></span></li>
         <li><span class="ico todo">2</span><div><div class="strong">Run <code>npm.cmd run app</code></div><div class="small muted">On Mac or Linux: <code>npm run app</code></div></div><span></span></li>
-        <li><span class="ico todo">3</span><div><div class="strong">Open <a href="http://localhost:8787">http://localhost:8787</a></div><div class="small muted">Keep the terminal open while you use the site.</div></div><span></span></li>
+        <li><span class="ico todo">3</span><div><div class="strong">Reload this page</div></div><span></span></li>
       </ol>
-      ${callout("The Receive side works without the agent: anyone can make a receiving code and open payouts here.", "neutral")}
+    </section>`;
+    }
+    // Opened as a plain website (the online Receive site): Send can't run here.
+    return `${head({ title })}
+    <section class="card stack" aria-label="Start the agent">
+      <div class="card-head" style="margin-bottom:0"><h2>Send runs on your own computer</h2>${badge("Not running here", "neutral")}</div>
+      <p>The Send side runs the agent on the client's own computer, so the wallet key never leaves it. To pay freelancers:</p>
+      <ol class="checks">
+        <li><span class="ico todo">1</span><div><div class="strong">Get Naira Reach from <a href="https://github.com/Mhiah/Naira-Reach" target="_blank" rel="noopener">github.com/Mhiah/Naira-Reach</a></div><div class="small muted">Install it with the README's steps. It needs Node.js 22.18 or newer.</div></div><span></span></li>
+        <li><span class="ico todo">2</span><div><div class="strong">In the Naira-Reach folder, run <code>npm.cmd run app</code></div><div class="small muted">On Mac or Linux: <code>npm run app</code></div></div><span></span></li>
+        <li><span class="ico todo">3</span><div><div class="strong">Open <a href="http://localhost:8787">http://localhost:8787</a></div><div class="small muted">Keep the terminal open while you use it.</div></div><span></span></li>
+      </ol>
+      ${callout('Getting paid? You don\'t need any of this. <a href="#/get/code">Go to Receive</a> to make your receiving code.', "neutral")}
     </section>`;
   }
 
