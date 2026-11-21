@@ -514,12 +514,34 @@
   }
 
   // ---------- Send: Freelancers ----------
+  // With nobody on the list, the form is shown straight away. After that it stays
+  // closed until "Add a freelancer" at the top opens it.
+  let addOpen = false;
+
   function freelancers() {
+    const hasList = S.freelancers.length > 0;
+    const showForm = !hasList || addOpen;
+    const form = `<section class="card" aria-label="Add a freelancer" id="add-freelancer">
+      <div class="card-head"><h2>Add a freelancer</h2></div>
+      <form class="form-grid" id="f-form" novalidate>
+        <div class="field"><label for="f-name">Name, as on their invoices</label><input class="input" id="f-name" name="name" autocomplete="off" placeholder="Ada Obi" required></div>
+        <div class="field"><label for="f-role">Role</label><input class="input" id="f-role" name="role" autocomplete="off" placeholder="Writer"></div>
+        <div class="field"><label for="f-limit">Limit per invoice (₦)</label><input class="input mono" id="f-limit" name="maxInvoiceNgn" inputmode="numeric" placeholder="500,000"></div>
+        <div class="field"><label for="f-aliases">Other names on their invoices</label><input class="input" id="f-aliases" name="aliases" autocomplete="off" placeholder="ada, Ada O."><span class="hint">Separate with commas.</span></div>
+        <div class="field"><label for="f-agreed">Fixed amount, if any (₦)</label><input class="input mono" id="f-agreed" name="agreedNgn" inputmode="numeric" placeholder="Leave empty"><span class="hint">Every invoice must match it exactly.</span></div>
+        <div class="field wide"><label for="f-code">Their receiving code</label><input class="input mono" id="f-code" name="metaAddress" autocomplete="off" spellcheck="false" placeholder="st:celo:0x…" required><span class="hint">They get it from the Receive side of this site. Check it with them on a call before saving.</span></div>
+        <div class="wide row">
+          ${hasList ? '<button class="btn btn-secondary" type="button" id="f-cancel">Cancel</button>' : ""}
+          <button class="btn btn-primary" type="submit" id="f-save">Save freelancer</button>
+        </div>
+      </form>
+    </section>`;
     return `${head({
       title: "Freelancers",
       lede: "The agent only pays people on this list, and only to the private code they shared with you. Addresses written on invoices are ignored.",
-      actions: `<button class="btn btn-primary" type="button" id="to-add">${icon("plus")}Add a freelancer</button>`,
+      actions: showForm ? "" : `<button class="btn btn-primary" type="button" id="to-add">${icon("plus")}Add a freelancer</button>`,
     })}
+    ${hasList && showForm ? form : ""}
     <section class="card" aria-label="Approved freelancers">
       ${S.freelancers.length ? `<div class="table-wrap"><table>
         <thead><tr><th>Name</th><th class="hide-sm">Receiving code</th><th class="hide-sm amount">Limit per invoice</th><th class="hide-sm amount">Invoices paid</th><th class="amount">Total paid</th><th class="amount"><span class="hide-sm">Remove</span></th></tr></thead>
@@ -533,18 +555,7 @@
         </tr>`).join("")}</tbody>
       </table></div>` : empty("people", "<p>No one on your list yet. The agent holds every invoice until you add the person billing.</p>")}
     </section>
-    <section class="card" aria-label="Add a freelancer" id="add-freelancer">
-      <div class="card-head"><h2>Add a freelancer</h2></div>
-      <form class="form-grid" id="f-form" novalidate>
-        <div class="field"><label for="f-name">Name, as on their invoices</label><input class="input" id="f-name" name="name" autocomplete="off" placeholder="Ada Obi" required></div>
-        <div class="field"><label for="f-role">Role</label><input class="input" id="f-role" name="role" autocomplete="off" placeholder="Writer"></div>
-        <div class="field"><label for="f-limit">Limit per invoice (₦)</label><input class="input mono" id="f-limit" name="maxInvoiceNgn" inputmode="numeric" placeholder="500,000"></div>
-        <div class="field"><label for="f-aliases">Other names on their invoices</label><input class="input" id="f-aliases" name="aliases" autocomplete="off" placeholder="ada, Ada O."><span class="hint">Separate with commas.</span></div>
-        <div class="field"><label for="f-agreed">Fixed amount, if any (₦)</label><input class="input mono" id="f-agreed" name="agreedNgn" inputmode="numeric" placeholder="Leave empty"><span class="hint">Every invoice must match it exactly.</span></div>
-        <div class="field wide"><label for="f-code">Their receiving code</label><input class="input mono" id="f-code" name="metaAddress" autocomplete="off" spellcheck="false" placeholder="st:celo:0x…" required><span class="hint">They get it from the Receive side of this site. Check it with them on a call before saving.</span></div>
-        <div class="wide"><button class="btn btn-primary" type="submit" id="f-save">Save freelancer</button></div>
-      </form>
-    </section>`;
+    ${!hasList ? form : ""}`;
   }
 
   // ---------- Send: Agent access ----------
@@ -849,6 +860,7 @@
     const { mode, page } = route();
     // A finished payment is cleared when you leave the page; a check in progress is kept.
     if (page !== "invoice" && INV && INV.result && !INV.paying) INV = null;
+    if (page !== "freelancers") addOpen = false;
     render();
     if (mode === "pay" && CFG.agent && (!S || Date.now() - SAt > 15000)) {
       if (page === "guide" && S) return;
@@ -899,8 +911,12 @@
           render();
         }).catch(() => {});
       case "to-add":
-        document.getElementById("add-freelancer").scrollIntoView({ behavior: "smooth", block: "start" });
-        return document.getElementById("f-name").focus({ preventScroll: true });
+        addOpen = true;
+        render();
+        return document.getElementById("f-name").focus();
+      case "f-cancel":
+        addOpen = false;
+        return render();
       case "activate":
         return busy(t, "Activating… about a minute", async () => {
           await api("POST", "/wallet/setup");
@@ -991,6 +1007,7 @@
     if (form.id === "f-form") {
       await busy(form.querySelector("#f-save"), "Saving", async () => {
         await api("POST", "/freelancers", data);
+        addOpen = false;
         toast(`${data.name} is on your list`);
         await loadState();
         render();

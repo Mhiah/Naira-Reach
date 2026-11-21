@@ -97,6 +97,7 @@ window.NR_GUIDES = {
         intro: "The agent only pays people on this list, and only to the private receiving code they gave you. Any wallet address written on an invoice is ignored.",
         steps: [
           "Ask your freelancer for their receiving code. They make it on the Receive side of this site.",
+          "Open <strong>Freelancers</strong> and press <strong>Add a freelancer</strong> at the top right. The first time, with nobody on the list yet, the form is already open.",
           "<strong>Name</strong>: exactly as it appears on their invoices.",
           "<strong>Other names</strong>: any other names they put on invoices, separated by commas.",
           "<strong>Limit per invoice</strong>: the largest invoice you expect from them. Bigger invoices are held for you to check.",
