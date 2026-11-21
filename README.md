@@ -134,18 +134,53 @@ Fill in `.env`. At minimum: `ATTRIBUTION_CODE`. A Textile API key is optional: w
 
 On Windows PowerShell, type `npm.cmd` where this README says `npm`, or run commands directly with `node src/cli.ts <command>`.
 
-### 2. The easy way: open the website
+### 2. Use the website: what we did, step by step
+
+Start it:
 
 ```bash
 npm run app
 ```
 
-Then open http://localhost:8787 and keep the terminal open while you use it.
+Open http://localhost:8787 and keep the terminal open. Closing it stops the agent, so after a restart, run the command again.
 
-- **Send** is the client's side. The Overview lists every set-up step with a tick or the next thing to do: attribution code, wallet key, USD₮ in the wallet, wallet activation, the agent's key, and a freelancer on the list. Pay an invoice shows each check and the price before anything moves. You approve the price, the agent locks a firm quote, and if the firm price is more than 1% above what you approved, nothing is sent.
-- **Receive** is the freelancer's side. Make a receiving code, back it up, open a receipt from the client, and move the naira. It works the same with or without the agent running, so a freelancer can use it on their own device.
+The site has two sides, chosen at the top left: **Send** for the client and **Receive** for the freelancer. The site only listens on this computer, and other websites can't use it: it checks where every request comes from, and each run has its own key that only the page it serves knows.
 
-The site only listens on this computer. Other websites can't use it: it checks where every request comes from, and each run has its own key that only the page it serves knows.
+#### Send: the client's side
+
+1. **Read the set-up list.** The Overview shows six steps, each with a tick or the next thing to do. Every step is done once; when all six are ticked, the list disappears.
+2. **Attribution code.** The code from Loops House enrollment, in `.env` as `ATTRIBUTION_CODE`.
+3. **Wallet key.** `npm run reach -- wallet new-key` writes the key into `.env` and prints only the address. That address is the wallet: an Altana wallet lives at its owner's own key address (EIP-7702).
+4. **Put USD₮ in the wallet.** Step 3 on the Overview has a **Copy address** button. Send **USDT on the Celo network**: Tether's USD₮, contract `0x48065fbBE25f71C9282ddf5e1cD6D6A887483D5e`. Not cUSD or USDC, because Textile's naira pair on Celo is cNGN against USD₮. We started with 5 USD₮ and later topped up to 10.55.
+5. **Add about 11 CELO, then press Activate wallet.** Altana charges a one-time fee to list a wallet in its public KeyStore. It was 10.2 CELO when we did it, about 55 cents, and only CELO can pay it. The same transaction registered the agent on ERC-8004: ours is agent **#10090**. The transaction fee itself was paid in USD₮, about 3 cents.
+6. **Check it on Loops House.** In the hackathon space, **Verify tag → Check on Celo** now shows "ERC-8004 identity registered".
+7. **Give the agent a key.** On **Agent access**, set USD₮ per week, naira per week, and how many days the key lasts. We chose 10 USD₮ and ₦15,000 a week for 14 days. Registering the key in the KeyStore costs another 10.2 CELO, so keep that much CELO in the wallet before clicking. The key may only approve USD₮, swap on Textile FX's LimitOrderReactor, and send cNGN and USD₮ gas money. The wallet refuses everything else onchain.
+8. **Keep Textile's proof fresh.** Giving the key also signs Textile's wallet proof, which lasts about 11 hours. After that, press **Re-sign Textile proof** on Agent access before paying.
+9. **Add a freelancer.** On **Freelancers**, enter their name as it appears on their invoices, any other names they use, a limit per invoice or a fixed amount, and the receiving code they made on the Receive side. Check the code with them on a call before saving.
+10. **Pay an invoice.** Drop the invoice on **Pay an invoice** (`.json`, or `.txt` with `ANTHROPIC_API_KEY` set). The agent shows every check, ignores any wallet address written on the invoice, and prices the exact naira billed. Press **Approve and pay**: you approve up to 1% above the price shown, the agent locks a firm quote, and approve, swap, payout and gas money go through as one transaction. If the firm price is higher, it holds and sends nothing.
+11. **Send the receipt.** Press **Download receipt** and send the file to the freelancer. It holds what they need to open the payout, and nothing personal.
+12. **Take the key back any time.** **Revoke the agent's key** on Agent access works from the next block.
+
+#### Receive: the freelancer's side
+
+This side runs entirely in the freelancer's browser, with or without the agent running. Their keys never leave it.
+
+1. **Make my receiving code.** The keys are made in the browser and sent nowhere.
+2. **Back up my keys.** This downloads a file. Whoever has it can open the payouts, so it stays private. **Restore a backup** brings the keys into another browser.
+3. **Copy code** and send it to the client. It is not a wallet address, and nobody can use it to look up what you've been paid.
+4. **Open a receipt** on **Payouts** when the client sends one. It only opens if the payout was made to your code.
+5. **Move naira.** Paste your own wallet or an exchange deposit address on Celo, then press **Move naira**. The network fee comes out of the 0.05 USD₮ that arrived with the payout.
+6. **Withdraw NGN to bank** through Textile, or through an exchange that accepts cNGN on Celo.
+
+#### What setting up cost us
+
+| Step | Cost |
+|---|---|
+| Activating the wallet | 10.2 CELO (Altana's one-time KeyStore fee) and about 0.03 USD₮ in transaction fees |
+| Giving the agent a key | 10.2 CELO (KeyStore fee for the key) and a few cents of USD₮ |
+| Each payment | The swap price plus Textile's fee, 0.05 USD₮ of gas money for the freelancer, and the transaction fee, all in USD₮ |
+
+CELO is only needed for those two registrations. Everything else is paid in USD₮.
 
 Everything below can also be done from the command line.
 
@@ -198,6 +233,8 @@ npm run reach -- session grant --usdt-per-week 200 --cngn-per-week 300000 --days
 
 Result: `Granted. Expires …`
 
+Each new key is listed in Altana's KeyStore for a one-time fee of about 10.2 CELO, so keep that much CELO in the wallet first.
+
 The grant also signs Textile's wallet proof, so the agent can get quotes without an API key. That proof lasts about 11 hours. After that, the client runs `npm run reach -- proof refresh`.
 
 ### 7. Client: approve the freelancer
@@ -248,9 +285,12 @@ npm run reach -- session revoke
 
 | What | Status |
 |---|---|
-| Unit and flow tests (no network) | 30 passing: tags, private payouts, invoice privacy, every hold, keyless Textile proofs, the full pay flow with a mocked Textile and wallet |
+| Wallet on Celo mainnet | [`0xB2441B175d620A3Fd5CDef28fA1c6957e6224431`](https://celoscan.io/address/0xB2441B175d620A3Fd5CDef28fA1c6957e6224431), activated |
+| ERC-8004 identity | [Agent #10090, "Naira Reach"](https://8004scan.io/agents/celo/10090), confirmed by the Loops House check |
+| The agent's key | 10 USD₮ and ₦15,000 a week, 14 days, four allowed calls. Listed in Altana's KeyStore: [wallet keys and permissions](https://explorer.altana.network/account/0xB2441B175d620A3Fd5CDef28fA1c6957e6224431) |
+| First payments | Coming next. Transaction links will be listed here. |
+| Tests (no network) | 47 passing: tags, private payouts, invoice privacy, every hold, keyless Textile proofs, the price guard, the full pay flow with a mocked Textile and wallet, the website's server and its protections, and the browser's key and receipt handling |
 | Typecheck | Clean |
-| Live run on Celo mainnet | Not yet. This section will list the transaction links once the first real payment is made. |
 
 Run the tests yourself:
 
@@ -276,7 +316,7 @@ Naira Reach keeps the freelancer's income private from the public. It does not h
 
 ## Honest limits
 
-- **Not yet run on mainnet.** Everything is tested without a network. The first live payments may surface details the mocks cannot.
+- **No payment made yet.** The wallet and the agent's key are live on Celo mainnet. The payment itself has only been tested without a network so far, and the first live payments may surface details the mocks cannot.
 - **Textile from an Altana wallet is untested.** Without an API key, Textile needs proof that the paying wallet asked for the quote. An Altana wallet is an EIP-7702 account whose address is the client's own key, so the client signs that proof, and Textile honours it for firm quotes for about 12 hours. Neither that proof nor the swap itself has been tried from an Altana wallet yet.
 - **Tags through the Altana relay.** Every call inside the intent carries the attribution tag, but the relay submits the outer transaction, so the tag may not be readable on it. `pay` reports this for every transaction, and `verify <hash>` checks any one. If the relay hides it, `--direct` sends each step from a plain wallet with the tag on the outer transaction.
 - **The first activation needs CELO.** Altana's one-time registration fee can only be paid in CELO, so a wallet holding only USD₮ can't be activated. About 11 CELO covers it.
