@@ -177,13 +177,18 @@ On the client's device. First make the wallet's key. It is written straight into
 npm run reach -- wallet new-key
 ```
 
-Back up `.env` somewhere safe, such as a password manager. Then create the wallet:
+Back up `.env` somewhere safe, such as a password manager. The command prints the wallet's address. Send it, on the Celo network:
+
+- **USD₮** for the payments themselves and the network fees.
+- **About 11 CELO**, once. The wallet's first transaction pays Altana's one-time registration fee, which was 10.2 CELO when we set ours up (about 55 cents), and only CELO can pay it. After that, every fee is paid in USD₮.
+
+Then activate the wallet:
 
 ```bash
 npm run reach -- wallet setup
 ```
 
-Result: the Altana wallet address and its ERC-8004 agent id. Send USD₮ to that address. Altana's relay pays itself in USD₮ when it accepts it and in CELO otherwise, so keep a little CELO there too until the first payment shows which one it took.
+Result: the Altana wallet address and its ERC-8004 agent id. On the website, this is the **Activate wallet** button on the Overview.
 
 ### 6. Client: give the agent a limited key
 
@@ -274,6 +279,7 @@ Naira Reach keeps the freelancer's income private from the public. It does not h
 - **Not yet run on mainnet.** Everything is tested without a network. The first live payments may surface details the mocks cannot.
 - **Textile from an Altana wallet is untested.** Without an API key, Textile needs proof that the paying wallet asked for the quote. An Altana wallet is an EIP-7702 account whose address is the client's own key, so the client signs that proof, and Textile honours it for firm quotes for about 12 hours. Neither that proof nor the swap itself has been tried from an Altana wallet yet.
 - **Tags through the Altana relay.** Every call inside the intent carries the attribution tag, but the relay submits the outer transaction, so the tag may not be readable on it. `pay` reports this for every transaction, and `verify <hash>` checks any one. If the relay hides it, `--direct` sends each step from a plain wallet with the tag on the outer transaction.
+- **The first activation needs CELO.** Altana's one-time registration fee can only be paid in CELO, so a wallet holding only USD₮ can't be activated. About 11 CELO covers it.
 - **cNGN is not a Celo gas token.** That is why each payout carries a few cents of USD₮, so the freelancer can move the naira without buying CELO.
 - **The receipt matters.** The freelancer needs the receipt to open a payout. An optional ERC-5564 announcer would let them find payouts from the chain alone, but there is no announcer deployed on Celo today.
 - **Cashing out.** cNGN is listed on Nigerian exchanges such as Busha and Quidax. Check that the one you use accepts cNGN on Celo.
