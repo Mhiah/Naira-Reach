@@ -221,7 +221,9 @@
         done: w.activated,
         title: "Wallet activated",
         doneNote: w.agentId ? `ERC-8004 agent #${esc(w.agentId)}` : "",
-        todo: `Its first transaction also registers Naira Reach's ERC-8004 identity.
+        todo: `Altana charges a one-time registration fee of about 10.2 CELO, and only CELO can pay it. Send about <strong>11 CELO</strong> on the Celo network to the same address${
+          live && live.celo != null ? ` (it holds <span class="mono">${live.celo.toLocaleString("en-US", { maximumFractionDigits: 2 })}</span> CELO now)` : ""
+        }. The first transaction also registers Naira Reach's ERC-8004 identity.
           <div class="step-action"><button class="btn btn-primary btn-sm" id="activate" type="button" ${w.hasKey && funded ? "" : "disabled"}>Activate wallet</button></div>`,
       },
       {

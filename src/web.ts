@@ -170,14 +170,19 @@ export function createWebApp(o: WebOptions) {
   async function balances(wallet: Address) {
     const read = (token: Address) =>
       withTimeout(o.reader.readContract({ address: token, abi: erc20Abi, functionName: "balanceOf", args: [wallet] }), 6000);
-    const [usdt, cngn, ids] = await Promise.all([
+    const [usdt, cngn, ids, celo] = await Promise.all([
       read(TOKENS.USDT),
       read(TOKENS.CNGN),
       read(ERC8004_IDENTITY_REGISTRY).catch(() => undefined),
+      // CELO pays Altana's one-time registration fee when the wallet is first activated.
+      Promise.resolve()
+        .then(() => withTimeout(o.reader.getBalance({ address: wallet }), 6000))
+        .catch(() => undefined),
     ]);
     return {
       usdt: Number(formatUnits(usdt, DECIMALS.USDT)),
       cngn: Number(formatUnits(cngn, DECIMALS.CNGN)),
+      celo: celo === undefined ? null : Number(formatUnits(celo, 18)),
       identities: ids === undefined ? null : Number(ids),
     };
   }
