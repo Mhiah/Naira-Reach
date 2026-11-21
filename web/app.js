@@ -194,7 +194,7 @@
         <li><span class="ico todo">2</span><div><div class="strong">In the Naira-Reach folder, run <code>npm.cmd run app</code></div><div class="small muted">On Mac or Linux: <code>npm run app</code></div></div><span></span></li>
         <li><span class="ico todo">3</span><div><div class="strong">Open <a href="http://localhost:8787">http://localhost:8787</a></div><div class="small muted">Keep the terminal open while you use it.</div></div><span></span></li>
       </ol>
-      ${callout('Getting paid? You don\'t need any of this. <a href="#/get/code">Go to Receive</a> to make your receiving code.', "neutral")}
+      ${callout('Getting paid? You don\'t need any of this. <a href="#/get/code">Go to Receive</a> to create your receiving code.', "neutral")}
     </section>`;
   }
 
@@ -670,10 +670,10 @@
       })}
       <section class="grid-2" aria-label="Receiving code">
         <article class="card stack">
-          <div class="card-head" style="margin-bottom:0"><h2>Make your code</h2>${badge("Private by design")}</div>
-          <p>Your keys are made here, in this browser, and stay here. Nothing is sent anywhere.</p>
+          <div class="card-head" style="margin-bottom:0"><h2>Create your code</h2>${badge("Private by design")}</div>
+          <p>Your keys are created here, in this browser, and stay here. Nothing is sent anywhere.</p>
           <div class="row">
-            <button class="btn btn-primary" type="button" id="make-keys">${icon("key")}Make my receiving code</button>
+            <button class="btn btn-primary" type="button" id="make-keys">${icon("key")}Create my receiving code</button>
             <button class="btn btn-secondary" type="button" id="restore">${icon("upload")}Restore a backup</button>
           </div>
         </article>
@@ -711,7 +711,7 @@
     const actions = `<a class="btn btn-secondary" href="https://app.textilecredit.com/" target="_blank" rel="noopener">${icon("external")}Withdraw NGN to bank</a>`;
     if (!keys) {
       return `${head({ title: "Payouts", lede: "Open a receipt from your client to see the payout and move the naira.", actions })}
-      <section class="card">${empty("code", `<p>Make your receiving code first. Payouts can only be opened with the keys behind it.</p><a class="btn btn-primary btn-sm" href="#/get/code">Make my receiving code</a>`)}</section>`;
+      <section class="card">${empty("code", `<p>Create your receiving code first. Payouts can only be opened with the keys behind it.</p><a class="btn btn-primary btn-sm" href="#/get/code">Create my receiving code</a>`)}</section>`;
     }
     const state = (p) => {
       const l = live[p.stealthAddress];
@@ -829,7 +829,7 @@
       const keys = store.get("keys", null);
       sideCard.innerHTML = keys
         ? `<span class="label">Your receiving code</span><span class="mono small clip">${esc(keys.metaAddress)}</span><a class="small" href="#/get/code">Copy or back up</a>`
-        : `<span class="label">Your receiving code</span><span class="strong">Not made yet</span><a class="small" href="#/get/code">Make one</a>`;
+        : `<span class="label">Your receiving code</span><span class="strong">Not created yet</span><a class="small" href="#/get/code">Create one</a>`;
       return;
     }
     const ses = activeSession();

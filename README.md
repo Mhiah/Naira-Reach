@@ -169,7 +169,7 @@ The site has two sides, chosen at the top left: **Send** for the client and **Re
 
 This side runs entirely in the freelancer's browser, with or without the agent running. Their keys never leave it.
 
-1. **Make my receiving code.** The keys are made in the browser and sent nowhere.
+1. **Create my receiving code.** The keys are created in the browser and sent nowhere.
 2. **Back up my keys.** This downloads a file. Whoever has it can open the payouts, so it stays private. **Restore a backup** brings the keys into another browser.
 3. **Copy code** and send it to the client. It is not a wallet address, and nobody can use it to look up what you've been paid.
 4. **Open a receipt** on **Payouts** when the client sends one. It only opens if the payout was made to your code.
@@ -198,9 +198,9 @@ npm run reach -- check
 
 Result: a checklist with ✓ for what is ready and ✗ with the next step for what is not.
 
-### 4. Freelancer: make a receiving code
+### 4. Freelancer: create a receiving code
 
-On the website: **Receive → Receiving code → Make my receiving code**, then **Back up my keys**.
+On the website: **Receive → Receiving code → Create my receiving code**, then **Back up my keys**.
 
 Or on the freelancer's own device:
 

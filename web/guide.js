@@ -139,13 +139,13 @@ window.NR_GUIDES = {
     lede: "How a freelancer makes a receiving code, opens a payout and moves the naira, one step at a time.",
     steps: [
       {
-        title: "Make your receiving code",
+        title: "Create your receiving code",
         img: "receive-1-make.webp",
-        alt: "The Make your code card with the Make my receiving code button outlined",
+        alt: "The Create your code card with the Create my receiving code button outlined",
         intro: "Instead of a wallet address, you give clients a receiving code. Each payment then lands at a brand-new address only you can open, so nobody can add up what you earn.",
         steps: [
           "Click <strong>Receive</strong> at the top left.",
-          "Press <strong>Make my receiving code</strong>.",
+          "Press <strong>Create my receiving code</strong>.",
         ],
         tip: "Your keys are made in this browser and stay in it. Nothing is sent anywhere, and you don't need a wallet or any money to start.",
       },
