@@ -13,9 +13,10 @@ import {
 } from "@altananetwork/sdk";
 import { existsSync, readFileSync } from "node:fs";
 import { parseUnits, type Address, type Hex } from "viem";
-import { generatePrivateKey } from "viem/accounts";
-import { DECIMALS, TEXTILE_REACTOR, TOKENS } from "./celo.ts";
+import { generatePrivateKey, privateKeyToAccount } from "viem/accounts";
+import { CELO_CHAIN_ID, DECIMALS, TEXTILE_REACTOR, TOKENS } from "./celo.ts";
 import { readJson, statePath, writeJson } from "./config.ts";
+import { saveStoredProof, signTakerProof } from "./proof.ts";
 
 const SESSION_FILE = () => statePath("session.json");
 const SESSION_KEY_FILE = () => statePath("session.key");
@@ -107,7 +108,24 @@ export async function grantAgentSession(adminKey: Hex, limits: SessionLimits) {
     throw new Error(`Grant failed: ${JSON.stringify(session.legs.filter((l) => l.status === "FAILED"))}`);
   }
   writeJson(SESSION_FILE(), serializeSession(session));
+  await refreshTakerProof(adminKey);
   return session;
+}
+
+/**
+ * Client: sign Textile's taker proof for the Altana wallet. The wallet is an
+ * EIP-7702 account, so its address is the client's own key and that key's
+ * signature proves control. Valid for firm quotes for about 12 hours.
+ */
+export async function refreshTakerProof(adminKey: Hex) {
+  const account = privateKeyToAccount(adminKey);
+  const wallet = clientWalletAddress();
+  if (wallet && wallet.toLowerCase() !== account.address.toLowerCase()) {
+    throw new Error(`This key controls ${account.address}, not the Altana wallet ${wallet}.`);
+  }
+  const proof = await signTakerProof(account, account.address, CELO_CHAIN_ID, { longLived: true });
+  saveStoredProof({ ...proof, taker: account.address, chainId: CELO_CHAIN_ID });
+  return proof;
 }
 
 /** Step 3 (client, any time): pull the agent's access. Effect is immediate. */

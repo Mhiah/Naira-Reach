@@ -2,6 +2,7 @@
 // Naira Reach asks for an exact-output quote: "deliver exactly N cNGN", so the
 // freelancer gets precisely what they billed and the client sees the USD₮ cost first.
 import { getAddress, type Address, type Hex } from "viem";
+import type { TakerProof } from "./proof.ts";
 
 export type TextileTx = { to: Address; data: Hex; value: string; chainId: number };
 
@@ -45,8 +46,8 @@ export class TextileClient {
   }
 
   /**
-   * Firm, executable quote bound to `taker`. With a partner API key no taker
-   * proof is needed (docs: "A key-authenticated RFQ request skips takerProof").
+   * Firm, executable quote bound to `taker`. Keyless callers prove control of the
+   * taker wallet with `takerProof`; a partner API key skips the proof.
    */
   async requestQuote(args: {
     chainId: number;
@@ -54,12 +55,9 @@ export class TextileClient {
     buyToken: Address;
     buyAmount: bigint;
     taker: Address;
+    takerProof?: TakerProof;
   }): Promise<FirmQuote> {
-    if (!this.apiKey) {
-      throw new TextileError(
-        "TEXTILE_API_KEY is not set. Get a partner key in the Textile app (connect wallet → your address → API keys).",
-      );
-    }
+    if (!this.apiKey && !args.takerProof) throw new TextileError("A keyless quote needs a taker proof.");
     const res = await this.fetchFn(`${this.baseUrl}/rfq/request`, {
       method: "POST",
       headers: this.headers(),
@@ -69,6 +67,7 @@ export class TextileClient {
         buyToken: args.buyToken,
         buyAmount: args.buyAmount.toString(),
         taker: args.taker,
+        ...(this.apiKey ? {} : { takerProof: args.takerProof }),
       }),
       // The server may hold a firm request for up to ~75s while makers price it.
       signal: AbortSignal.timeout(75_000),

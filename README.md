@@ -56,7 +56,7 @@ Before any money moves, the agent runs these checks. A failed check is a **hold*
 |---|---|
 | Invoice reader | Reads a JSON invoice directly, or a plain-text invoice with Claude. Contact and bank details are stripped before the text leaves the machine, and the model can only answer through a fixed form. |
 | Checks and ledger | The approved freelancer list, the record of paid invoices, and the holds above. |
-| Textile FX client | Requests a firm, exact-output USD₮ → cNGN quote and reports the fill. |
+| Textile FX client | Requests a firm, exact-output USD₮ → cNGN quote and reports the fill. Works without an API key by proving control of the paying wallet. |
 | Altana wallet and session | Sets up the client's wallet, grants and revokes the agent's limited key, and sends each payment as one atomic intent. |
 | Private payouts | Makes the freelancer's receiving code, derives a fresh address per invoice, and lets the freelancer open it later. |
 | Attribution | Adds the Loops House code to every transaction (ERC-8021) and checks it is readable onchain. |
@@ -129,7 +129,7 @@ npm install --omit=dev
 cp .env.example .env
 ```
 
-Fill in `.env`. At minimum: `ATTRIBUTION_CODE` and `TEXTILE_API_KEY`.
+Fill in `.env`. At minimum: `ATTRIBUTION_CODE`. A Textile API key is optional: without one, the paying wallet signs a short proof that it is the one asking for the quote.
 
 On Windows PowerShell, type `npm.cmd` where this README says `npm`, or run commands directly with `node src/cli.ts <command>`.
 
@@ -168,6 +168,8 @@ npm run reach -- session grant --usdt-per-week 200 --cngn-per-week 300000 --days
 ```
 
 Result: `Granted. Expires …`
+
+The grant also signs Textile's wallet proof, so the agent can get quotes without an API key. That proof lasts about 11 hours. After that, the client runs `npm run reach -- proof refresh`.
 
 ### 6. Client: approve the freelancer
 
@@ -217,7 +219,7 @@ npm run reach -- session revoke
 
 | What | Status |
 |---|---|
-| Unit and flow tests (no network) | 26 passing: tags, private payouts, invoice privacy, every hold, the full pay flow with a mocked Textile and wallet |
+| Unit and flow tests (no network) | 30 passing: tags, private payouts, invoice privacy, every hold, keyless Textile proofs, the full pay flow with a mocked Textile and wallet |
 | Typecheck | Clean |
 | Live run on Celo mainnet | Not yet. This section will list the transaction links once the first real payment is made. |
 
@@ -246,7 +248,7 @@ Naira Reach keeps the freelancer's income private from the public. It does not h
 ## Honest limits
 
 - **Not yet run on mainnet.** Everything is tested without a network. The first live payments may surface details the mocks cannot.
-- **Textile from a smart wallet is untested.** Textile's docs say contract wallets can be the taker and are verified onchain via ERC-1271. Naira Reach uses a partner API key, so no wallet signature is needed for the quote, but the swap itself has not yet been sent from an Altana wallet.
+- **Textile from an Altana wallet is untested.** Without an API key, Textile needs proof that the paying wallet asked for the quote. An Altana wallet is an EIP-7702 account whose address is the client's own key, so the client signs that proof, and Textile honours it for firm quotes for about 12 hours. Neither that proof nor the swap itself has been tried from an Altana wallet yet.
 - **Tags through the Altana relay.** Every call inside the intent carries the attribution tag, but the relay submits the outer transaction, so the tag may not be readable on it. `pay` reports this for every transaction, and `verify <hash>` checks any one. If the relay hides it, `--direct` sends each step from a plain wallet with the tag on the outer transaction.
 - **cNGN is not a Celo gas token.** That is why each payout carries a few cents of USD₮, so the freelancer can move the naira without buying CELO.
 - **The receipt matters.** The freelancer needs the receipt to open a payout. An optional ERC-5564 announcer would let them find payouts from the chain alone, but there is no announcer deployed on Celo today.
@@ -274,6 +276,7 @@ Naira Reach keeps the freelancer's income private from the public. It does not h
 | `wallet setup` | Client | Creates and activates the Altana wallet; registers the ERC-8004 identity |
 | `session grant [--usdt-per-week N] [--cngn-per-week N] [--days N]` | Client | Gives the agent a capped, expiring key |
 | `session revoke` | Client | Removes the agent's key |
+| `proof refresh` | Client | Re-signs Textile's wallet proof, needed about every 11 hours when there is no API key |
 | `freelancer add --id --name --meta [--max] [--agreed] [--alias]` | Client | Approves a freelancer's receiving code |
 | `freelancer list` | Client | Approved freelancers and totals paid |
 | `pay <invoice> [--dry-run] [--direct] [--approve-holds]` | Agent | Settles an invoice. `--dry-run` prices it with Textile's preview and sends nothing |
@@ -286,7 +289,7 @@ Naira Reach keeps the freelancer's income private from the public. It does not h
 | Variable | Needed for | Notes |
 |---|---|---|
 | `ATTRIBUTION_CODE` | Everything that sends | The code from Loops House enrollment |
-| `TEXTILE_API_KEY` | Paying | Textile partner key, scope `trades:write` |
+| `TEXTILE_API_KEY` | Optional | Textile partner key. Without it, quotes are proven with a wallet signature |
 | `CLIENT_ADMIN_PRIVATE_KEY` | Client commands | Stays on the client's device |
 | `ANTHROPIC_API_KEY` | Plain-text invoices | Optional |
 | `MAX_INVOICE_USDT` | Paying | Per-invoice dollar ceiling, default 500 |
@@ -329,6 +332,7 @@ Sources: the Textile FX address book, Celo's fee currency list, and the Altana S
 | `src/invoice.ts` | Invoice reading, redaction and fingerprints |
 | `src/checks.ts` | Approved freelancers, the ledger and the holds |
 | `src/textile.ts` | Textile FX RFQ client |
+| `src/proof.ts` | Textile's keyless wallet proof |
 | `src/altana.ts` | Client wallet and the agent's session key |
 | `src/executor.ts` | Sending through Altana (atomic) or a plain wallet |
 | `src/stealth.ts` | Private payout addresses (ERC-5564 scheme 1) |

@@ -18,6 +18,8 @@ export type PayDeps = {
   /** Needed to send. A dry run works without one. */
   executor?: Executor;
   textile: TextileClient;
+  /** No partner API key: prove control of the paying wallet instead. */
+  textileKeyless?: boolean;
   reader: PublicClient;
   code: string;
   maxUsdt: number;
@@ -99,6 +101,7 @@ export async function payInvoice(invoicePath: string, d: PayDeps): Promise<PayOu
     buyToken: TOKENS.CNGN,
     buyAmount,
     taker: executor.address,
+    takerProof: d.textileKeyless ? await executor.takerProof(CELO_CHAIN_ID) : undefined,
   });
   assertQuote(quote, executor.address, buyAmount);
   const takerPays = BigInt(quote.quote.takerPays);

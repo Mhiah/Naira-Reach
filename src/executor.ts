@@ -6,9 +6,10 @@
 //           fallback, since every transaction carries the tag in its own calldata.
 import { createClient as createAltanaClient, CELO, NATIVE_TOKEN, type Session } from "@altananetwork/sdk";
 import { createPublicClient, createWalletClient, http, type Address, type Hex, type PublicClient } from "viem";
-import { privateKeyToAccount } from "viem/accounts";
+import { privateKeyToAccount, type PrivateKeyAccount } from "viem/accounts";
 import { celo } from "viem/chains";
 import { TOKENS } from "./celo.ts";
+import { loadStoredProof, signTakerProof, type TakerProof } from "./proof.ts";
 import { tagCalldata } from "./tag.ts";
 
 export type Call = { to: Address; data: Hex; value?: bigint; label: string };
@@ -20,6 +21,8 @@ export interface Executor {
   /** The wallet funds leave from. It is also the Textile taker. */
   readonly address: Address;
   send(calls: Call[]): Promise<SendResult>;
+  /** Proof for Textile that this wallet is the one asking for the quote. */
+  takerProof(chainId: number): Promise<TakerProof>;
 }
 
 export function publicClient(rpcUrl: string): PublicClient {
@@ -48,6 +51,11 @@ export class AltanaExecutor implements Executor {
     });
     return { hashes: result.transactionHash ? [result.transactionHash] : [], status: result.status };
   }
+
+  /** The client signed this when granting the session; Textile honours it for about 12 hours. */
+  async takerProof(chainId: number): Promise<TakerProof> {
+    return loadStoredProof(this.address, chainId);
+  }
 }
 
 export class DirectExecutor implements Executor {
@@ -56,10 +64,12 @@ export class DirectExecutor implements Executor {
   private readonly wallet;
   private readonly reader: PublicClient;
   private readonly code: string;
+  private readonly account: PrivateKeyAccount;
 
   constructor(privateKey: Hex, rpcUrl: string, code: string) {
     this.code = code;
     const account = privateKeyToAccount(privateKey);
+    this.account = account;
     this.address = account.address;
     this.wallet = createWalletClient({ account, chain: celo, transport: http(rpcUrl) });
     this.reader = publicClient(rpcUrl);
@@ -74,5 +84,9 @@ export class DirectExecutor implements Executor {
       if (receipt.status !== "success") return { hashes, status: "FAILED" };
     }
     return { hashes, status: "CONFIRMED" };
+  }
+
+  async takerProof(chainId: number): Promise<TakerProof> {
+    return signTakerProof(this.account, this.address, chainId);
   }
 }

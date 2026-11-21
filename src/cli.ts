@@ -3,7 +3,7 @@
 import { readFileSync } from "node:fs";
 import { parseArgs } from "node:util";
 import { formatUnits, getAddress, isAddress, type Address, type Hex } from "viem";
-import { activateClientWallet, clientWalletAddress, grantAgentSession, hasAgentSession, loadAgentSession, revokeAgentSession } from "./altana.ts";
+import { activateClientWallet, clientWalletAddress, grantAgentSession, hasAgentSession, loadAgentSession, refreshTakerProof, revokeAgentSession } from "./altana.ts";
 import { DECIMALS, EXPLORER_TX, TOKENS } from "./celo.ts";
 import { fmt, loadFreelancers, loadLedger, saveFreelancers, type Freelancer } from "./checks.ts";
 import { claimPayout, createFreelancerKeys } from "./claim.ts";
@@ -21,6 +21,7 @@ Client (the one paying)
   wallet setup                 Create and activate your Altana wallet (also registers its ERC-8004 identity)
   session grant                Give the agent a limited key  [--usdt-per-week 200] [--cngn-per-week 300000] [--days 7]
   session revoke               Take the agent's key back, effective immediately
+  proof refresh                Re-sign Textile's wallet proof (needed about every 11 hours, keyless only)
   freelancer add               Approve a freelancer  --id ada --name "Ada O." --meta st:celo:0x… [--max 500000] [--agreed 150000]
   freelancer list              Show approved freelancers and what has been paid
 
@@ -48,6 +49,9 @@ async function main() {
     case "session":
       if (sub === "grant") return sessionGrant(rest);
       if (sub === "revoke") return sessionRevoke();
+      break;
+    case "proof":
+      if (sub === "refresh") return proofRefresh();
       break;
     case "freelancer":
       if (sub === "add") return freelancerAdd(rest);
@@ -97,6 +101,12 @@ async function sessionRevoke() {
   const key = privateKey("CLIENT_ADMIN_PRIVATE_KEY", "The client revokes with their own key.");
   const r = await revokeAgentSession(key);
   console.log(`Revoked: ${JSON.stringify(r.status)}${r.transactionHash ? `  ${EXPLORER_TX(r.transactionHash)}` : ""}`);
+}
+
+async function proofRefresh() {
+  const key = privateKey("CLIENT_ADMIN_PRIVATE_KEY", "The client signs the proof with their own key.");
+  const p = await refreshTakerProof(key);
+  console.log(`Signed. The agent can get Textile quotes until about ${new Date(p.issuedAt + 11 * 3600_000).toLocaleString()}.`);
 }
 
 function freelancerAdd(argv: string[]) {
@@ -160,6 +170,7 @@ async function pay(argv: string[]) {
   const outcome = await payInvoice(invoicePath, {
     executor,
     textile: new TextileClient(settings.textileUrl(), settings.textileKey()),
+    textileKeyless: !settings.textileKey(),
     reader: publicClient(rpcUrl),
     code,
     maxUsdt: settings.maxInvoiceUsdt(),
@@ -235,7 +246,7 @@ function check() {
     code = attributionCode();
   } catch {}
   line(Boolean(code), `Attribution code${code ? `: ${code}` : ""}`, "set ATTRIBUTION_CODE (from Loops House enrollment)");
-  line(Boolean(settings.textileKey()), "Textile API key", "set TEXTILE_API_KEY (Textile app → your address → API keys)");
+  console.log(`${settings.textileKey() ? "✓ Textile API key" : "• Textile: keyless (quotes are proven with a wallet signature)"}`);
   line(Boolean(process.env.CLIENT_ADMIN_PRIVATE_KEY), "Client wallet key (client device only)", "set CLIENT_ADMIN_PRIVATE_KEY to run wallet setup / session grant");
   const wallet = clientWalletAddress();
   line(Boolean(wallet), `Client Altana wallet${wallet ? `: ${wallet}` : ""}`, "run: wallet setup");

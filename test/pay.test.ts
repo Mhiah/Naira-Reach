@@ -5,6 +5,7 @@ import { privateKeyToAccount } from "viem/accounts";
 import { TEXTILE_REACTOR, TOKENS } from "../src/celo.ts";
 import { loadLedger, saveFreelancers } from "../src/checks.ts";
 import type { Call, Executor, SendResult } from "../src/executor.ts";
+import type { TakerProof } from "../src/proof.ts";
 import { anthropicExtractor } from "../src/invoice.ts";
 import { buildCalls, payInvoice, type PayDeps } from "../src/pay.ts";
 import { parseQuote } from "../src/textile.ts";
@@ -22,6 +23,9 @@ class FakeExecutor implements Executor {
   async send(calls: Call[]): Promise<SendResult> {
     this.sent.push(calls);
     return { hashes: [("0x" + "ab".repeat(32)) as Hex], status: "CONFIRMED" };
+  }
+  async takerProof(): Promise<TakerProof> {
+    return { nonce: ("0x" + "11".repeat(32)) as Hex, issuedAt: 1, signature: "0x1234" as Hex, scheme: "eip712" };
   }
 }
 
@@ -114,6 +118,19 @@ describe("paying an invoice end to end (no network)", () => {
     expect(receipt.payout.ephemeralPublicKey).toBe(out.plan.payout.ephemeralPublicKey);
     expect(receipt.invoice.fingerprint).toMatch(/^0x[0-9a-f]{64}$/);
     expect(out.plan.usdtCost).toBeCloseTo(103.5);
+  });
+
+  it("without an API key, proves control of the paying wallet instead", async () => {
+    const invoice = writeFile(dir, "inv.json", JSON.stringify({ invoiceId: "INV-K", freelancer: "ada", amountNgn: 1000 }));
+    const textile = textileReplying("700000", "1000000000");
+    const out = await payInvoice(invoice, {
+      ...deps(new FakeExecutor(), textile.fn),
+      textile: new TextileClient("https://textile.test/v2", undefined, textile.fn),
+      textileKeyless: true,
+    });
+    expect(out.status).toBe("paid");
+    expect(textile.calls[0]!.body).toMatchObject({ takerProof: { nonce: "0x" + "11".repeat(32), signature: "0x1234" } });
+    expect((textile.calls[0]!.init.headers as Record<string, string>).Authorization).toBeUndefined();
   });
 
   it("refuses to pay the same invoice twice", async () => {
