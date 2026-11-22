@@ -17,7 +17,7 @@ Built for **Agents Open for Business** (Loops House, on Celo), entering the **St
 <td align="center"><b>Agent identity</b><br><a href="https://8004scan.io/agents/celo/10090">ERC-8004 #10090</a></td>
 <td align="center"><b>Client wallet</b><br><a href="https://celoscan.io/address/0xB2441B175d620A3Fd5CDef28fA1c6957e6224431">0xB244…4431</a></td>
 <td align="center"><b>Agent's key</b><br><a href="https://explorer.altana.network/account/0xB2441B175d620A3Fd5CDef28fA1c6957e6224431">Altana explorer</a></td>
-<td align="center"><b>Tests</b><br><a href="#tests">148 passing</a></td>
+<td align="center"><b>Tests</b><br><a href="#tests">157 passing</a></td>
 </tr>
 </table>
 
@@ -91,7 +91,7 @@ Everything below is live on Celo mainnet (chain 42220) and can be checked on the
 | **Where the money went** | 1.388546 USD₮ to Textile's maker plus 0.000277 USD₮ fee. Exactly 2,000 cNGN and 0.05 USD₮ of gas money to a fresh private address, [`0x2448…9828`](https://celoscan.io/address/0x244863ede6688da2a60d2f77fd4ed9ee75729828). Nothing left behind: the wallet holds 0 cNGN and its leftover allowance to Textile is 0 |
 | **Automatic delivery** | The standard ERC-5564 announcer, deployed on Celo by Naira Reach at the same address it has on other chains: [`0x5564…5564`](https://celoscan.io/address/0x55649E01B5Df198D18D95b5cc5051630cfD45564). The ₦2,000 was announced in [0x14b4…5fc9](https://celoscan.io/tx/0x14b4850f552900f143b26ecc45e35721f5eeed7e1ab91ab3a50ca2633bed5fc9), and the Receive page found it with nothing but the receiver's own keys |
 | **Attribution** | Every call inside the payment carries the Loops House code (ERC-8021). The outer transaction is sent by Altana's relayer, so Loops House doesn't count it yet: see [Honest limits](#honest-limits) |
-| **Tests** | 148 passing, no network needed. See [Tests](#tests) |
+| **Tests** | 157 passing, no network needed. See [Tests](#tests) |
 | **Live checks** | Textile's live preview gave a flat ₦1,442.52 per USD₮ from ₦1,000 to ₦20,000,000, with a 0.02% fee, answering in 0.3 to 1.1 seconds. A ₦150,000 quote didn't move at all over 66 seconds of sampling |
 
 ---
@@ -338,7 +338,7 @@ npm install
 npm test
 ```
 
-**148 tests in 12 files, all passing, with no network needed.** They cover:
+**157 tests in 13 files, all passing, with no network needed.** They cover:
 
 | Area | What is checked |
 |---|---|
@@ -348,7 +348,7 @@ npm test
 | Private addresses | Our ERC-5564 addresses match ScopeLift's reference library, 300 out of 300 |
 | Delivery | Announcements built correctly, the standard announcer address, and finding payouts from announcements, including junk logs and a busy RPC. A fake announcement claiming money that never arrived shows ₦0 |
 | Moving a payout | The freelancer's transaction signed against a simulated Celo node, decoded, and its signer recovered. Refuses the zero address and token contracts |
-| Attribution | Tags byte-identical to the official ERC-8021 encoder |
+| Attribution | Tags byte-identical to the official ERC-8021 encoder. The wallet sending its own Altana payment: the signed intent encoded exactly as Altana's relayer encodes it, sent from the wallet with the tag last, checked for free before sending |
 | Holds | Every check in [What it catches](#what-it-catches) |
 | Invoices | Redaction before the AI reader (emails, phones and account numbers however they're written, IBANs, wallet addresses), strict amounts (no booleans, hex or exponents), size limits |
 | Keys | The password vault (wrong password, tampered file), the browser's key handling |
