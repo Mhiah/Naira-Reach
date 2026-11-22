@@ -255,10 +255,11 @@ Open [nairareach.myacxt.site](https://nairareach.myacxt.site). Choose **Send** o
 7. **Keep your wallet safe.** **Download locked backup** saves your wallet, encrypted with your password. **Lock Send** when you step away.
 8. **Turn on automatic delivery**, if the Overview shows that card. It announces any earlier payouts so they appear on the freelancer's side. From then on, every payment announces itself.
 9. **Add a freelancer.** On **Freelancers**, enter their name as it appears on their invoices, any other names, a limit per invoice or a fixed amount, and the receiving code they made on the Receive side. Check the code with them on a call before saving.
-10. **Pay an invoice.** Drop the invoice's `.json` file on **Pay an invoice**. The agent shows every check, ignores any wallet address written on the invoice, and prices the exact naira billed. Press **Approve and pay**: you approve up to 1% above the price shown, and if the firm price is higher, nothing is sent.
+10. **Create the invoice.** On **Pay an invoice**, pick the freelancer, type the naira amount and press **Check and price**. The invoice number is filled in for you; no file is needed. If your freelancer sent an invoice file, **Or use an invoice file** takes it instead, and ignores any wallet address written on it.
+11. **Check and pay.** The agent shows every check and prices the exact naira billed. Press **Approve and pay**: you approve up to 1% above the price shown, and if the firm price is higher, nothing is sent.
 
-    <img src="web/guide/send-10-pay.webp" alt="Pay an invoice: the invoice, the checks and the quote" width="640">
-11. **Paid and delivered.** The naira is at a fresh private address, and it's already on the freelancer's Receive page. **Download receipt** keeps a copy for your records.
+    <img src="web/guide/send-11-pay.webp" alt="Pay an invoice: the invoice, the checks and the quote" width="640">
+12. **Paid and delivered.** The naira is at a fresh private address, and it's already on the freelancer's Receive page. **Download receipt** keeps a copy for your records.
 
 ### Receive: the freelancer's side
 
