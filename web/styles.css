@@ -194,7 +194,7 @@ td .sub { display: block; font-size: var(--fs-small); color: var(--color-muted);
 
 /* ---------- Forms ---------- */
 .field { display: flex; flex-direction: column; gap: var(--s2); }
-.field label { font-size: var(--fs-small); font-weight: 600; }
+.field label, .field-label { font-size: var(--fs-small); font-weight: 600; }
 .input, textarea.input {
   font: inherit; color: var(--color-text);
   background: var(--color-bg); border: 1px solid var(--color-border); border-radius: var(--radius-button);
@@ -220,6 +220,9 @@ td .sub { display: block; font-size: var(--fs-small); color: var(--color-muted);
 .stack { display: flex; flex-direction: column; gap: var(--s4); }
 .row { display: flex; gap: var(--s3); align-items: center; flex-wrap: wrap; }
 .spread { display: flex; justify-content: space-between; align-items: center; gap: var(--s3); }
+.card.narrow { max-width: 520px; }
+details > summary { cursor: pointer; color: var(--color-muted); font-weight: 600; }
+details > summary:hover { color: var(--color-text); }
 
 /* ---------- Chart ---------- */
 .chart { display: flex; flex-direction: column; }

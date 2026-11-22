@@ -1,9 +1,12 @@
 // Naira Reach web app: one site, two sides. Plain JavaScript, no build step.
-//  Send:    talks to the agent running on this computer (npm run app).
+//  Send:    the agent. On the online site it runs in this browser (vendor/send.js),
+//           with its keys locked by the client's password; on a laptop it runs
+//           behind `npm run app`.
 //  Receive: runs entirely in this browser. Receiving keys never leave it.
 (function () {
   "use strict";
   const CFG = window.NR_CONFIG || { agent: false };
+  const HOSTED = !CFG.agent; // the online site: the agent runs in this browser
   const R = window.NRReceive;
   const RPC = CFG.rpcUrl || "https://forno.celo.org";
   const view = document.getElementById("view");
@@ -43,6 +46,8 @@
     plus: '<path d="M12 5v14M5 12h14"/>',
     external: '<path d="M14 4h6v6M20 4l-9 9"/><path d="M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5"/>',
     terminal: '<rect x="3" y="4" width="18" height="16" rx="2"/><path d="m7 9 3 3-3 3M12 15h5"/>',
+    lock: '<rect x="5" y="10.5" width="14" height="10" rx="2"/><path d="M8 10.5V7.5a4 4 0 0 1 8 0v3"/>',
+    laptop: '<rect x="4" y="5" width="16" height="11" rx="1.5"/><path d="M2 19h20"/>',
   };
   const icon = (name) => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${I[name]}</svg>`;
   const badge = (text, kind = "") => `<span class="badge ${kind}"><span class="dot"></span>${esc(text)}</span>`;
@@ -139,7 +144,32 @@
   let stateError = null;
   let dirty = false; // the person is typing: don't redraw under them
 
+  // On the online site the agent is a script loaded only when Send is opened.
+  let sendLoading = null;
+  let sendLoadError = null;
+  function loadSend() {
+    if (window.NRSend) return Promise.resolve(window.NRSend);
+    if (!sendLoading) {
+      sendLoading = new Promise((resolve, reject) => {
+        const s = Object.assign(document.createElement("script"), { src: "vendor/send.js" });
+        s.onload = () => (window.NRSend ? resolve(window.NRSend) : reject(new Error("Send didn't load. Reload the page.")));
+        s.onerror = () => {
+          sendLoading = null;
+          s.remove();
+          reject(new Error("Send didn't load. Check your connection and reload the page."));
+        };
+        document.head.appendChild(s);
+      });
+    }
+    return sendLoading;
+  }
+  const sendStatus = () => (window.NRSend ? window.NRSend.status() : "loading");
+  const where = HOSTED ? "this browser" : "this computer";
+  const onWhere = HOSTED ? "in this browser" : "on this computer";
+  let importFile = null; // the locked file chosen on the set-up screen
+
   async function api(method, path, body) {
+    if (HOSTED) return (await loadSend()).dispatch(method, path, body || {});
     // Every change is sent as JSON, even with nothing in it: the agent refuses anything else.
     const sendsBody = method !== "GET";
     const res = await fetch("/api" + path, {
@@ -153,6 +183,10 @@
   }
 
   async function loadState() {
+    if (HOSTED && sendStatus() !== "unlocked") {
+      S = null;
+      return;
+    }
     try {
       S = await api("GET", "/state");
       SAt = Date.now();
@@ -198,6 +232,72 @@
     </section>`;
   }
 
+  // ---------- Send on the online site: set up, unlock ----------
+  const safety = callout(
+    "Your keys stay in this browser, locked with your password. Naira Reach's server only passes Textile's prices along; it never sees a key or your password. Clearing this browser's data deletes them, so download the locked backup from Agent access once you're set up. A forgotten password can't be reset.",
+    "neutral",
+    "shield",
+  );
+
+  function sendSetup(title) {
+    const st = sendStatus();
+    if (sendLoadError && st === "loading") return `${head({ title })}<section class="card">${callout(esc(sendLoadError), "", "flag")}</section>`;
+    if (st === "loading") return `${head({ title })}${loading("Loading Send…")}`;
+    if (st === "unlocked") {
+      return stateError
+        ? `${head({ title })}<section class="card stack">${callout(`The agent couldn't load your records: ${esc(stateError)}`, "", "flag")}<div><button class="btn btn-secondary" id="retry" type="button">Try again</button></div></section>`
+        : `${head({ title })}${loading("Opening your agent…")}`;
+    }
+    if (st === "locked") {
+      return `${head({ title: "Unlock Send", lede: "Your agent is in this browser, locked with your password." })}
+      <section class="card narrow stack" aria-label="Unlock">
+        <form class="stack" id="unlock-form" novalidate>
+          <input type="text" name="username" value="Naira Reach Send" autocomplete="username" hidden>
+          <div class="field"><label for="u-pw">Password</label><input class="input" type="password" id="u-pw" name="password" autocomplete="current-password" required></div>
+          <div><button class="btn btn-primary" id="u-go" type="submit">${icon("lock")}Unlock</button></div>
+        </form>
+        <details class="small">
+          <summary>Use a different agent</summary>
+          <div class="stack" style="margin-top:12px">
+            <p class="muted">This removes the agent from this browser. Your wallet and its money stay onchain; you can bring the agent back with its locked file and password.</p>
+            <label class="check-line"><input type="checkbox" id="forget-ok"><span>I have the locked file and its password</span></label>
+            <div><button class="btn btn-secondary btn-sm" id="forget" type="button" disabled>Remove it from this browser</button></div>
+          </div>
+        </details>
+      </section>`;
+    }
+    return `${head({ title: "Set up Send", lede: "Send runs in this browser: the agent pays invoices from your own wallet, within the limits you set." })}
+    <section class="grid-2" aria-label="Set up Send">
+      <article class="card stack">
+        <div class="card-head" style="margin-bottom:0"><h2>Bring your agent from your laptop</h2>${badge("Keeps your wallet", "neutral")}</div>
+        <ol class="checks">
+          <li><span class="ico todo">1</span><div><div class="strong">On your laptop, open Naira Reach</div><div class="small muted">Agent access, then <strong>Move to the online site</strong></div></div><span></span></li>
+          <li><span class="ico todo">2</span><div><div class="strong">Choose a password and download the locked file</div></div><span></span></li>
+          <li><span class="ico todo">3</span><div><div class="strong">Choose that file here, with the same password</div></div><span></span></li>
+        </ol>
+        <form class="stack" id="import-form" novalidate>
+          <input type="text" name="username" value="Naira Reach Send" autocomplete="username" hidden>
+          <div class="field"><span class="field-label">Locked file</span><div class="row"><button class="btn btn-secondary btn-sm" id="import-pick" type="button">${icon("upload")}Choose file</button><span class="small muted" id="import-name">${importFile ? esc(importFile.name) : "No file chosen"}</span></div></div>
+          <div class="field"><label for="i-pw">Password</label><input class="input" type="password" id="i-pw" name="password" autocomplete="current-password"></div>
+          <div><button class="btn btn-primary" id="i-go" type="submit">Open my agent</button></div>
+        </form>
+      </article>
+      <article class="card stack">
+        <div class="card-head" style="margin-bottom:0"><h2>Start a new wallet here</h2></div>
+        <p class="small muted">A new wallet key is made in this browser. Altana's one-time fees take about <strong>21 CELO</strong> (10.2 to activate the wallet, 10.2 for the agent's key), plus the USD₮ you pay invoices with.</p>
+        <form class="form-grid" id="new-form" novalidate>
+          <input type="text" name="username" value="Naira Reach Send" autocomplete="username" hidden>
+          <div class="field wide"><label for="n-name">Your name <span class="muted">(optional)</span></label><input class="input" id="n-name" name="clientName" autocomplete="name" maxlength="40"></div>
+          <div class="field wide"><label for="n-pw">Password</label><input class="input" type="password" id="n-pw" name="password" autocomplete="new-password"></div>
+          <div class="field wide"><label for="n-pw2">Repeat it</label><input class="input" type="password" id="n-pw2" name="repeat" autocomplete="new-password"></div>
+          <div class="wide"><p class="small muted">At least 10 characters. Nobody can reset it for you.</p></div>
+          <div class="wide"><button class="btn btn-primary" id="n-go" type="submit">${icon("key")}Create my wallet</button></div>
+        </form>
+      </article>
+    </section>
+    <section class="card stack">${safety}${callout('Getting paid? You don\'t need any of this. <a href="#/get/code">Go to Receive</a> to create your receiving code.', "neutral")}</section>`;
+  }
+
   // ---------- Send: Overview ----------
   function setupSteps() {
     const w = S.wallet;
@@ -212,7 +312,7 @@
       },
       {
         done: Boolean(w.address),
-        title: "Wallet key on this computer",
+        title: `Wallet key ${onWhere}`,
         doneNote: `<span class="mono">${esc(short(w.address))}</span>`,
         todo: "In the Naira-Reach folder run <code>npm.cmd run reach -- wallet new-key</code>, then restart the agent.",
       },
@@ -371,7 +471,7 @@
         <div class="drop" id="drop">
           ${icon("upload")}
           <p class="strong">Drop an invoice here</p>
-          <p class="small muted">${S.agent.aiReader ? "Contact and bank details are removed before the AI reads it." : "Plain-text invoices need the AI reader: add ANTHROPIC_API_KEY to .env."}</p>
+          <p class="small muted">${S.agent.aiReader ? "Contact and bank details are removed before the AI reads it." : HOSTED ? "Online, invoices are read from .json files. Plain-text invoices need the laptop version's AI reader." : "Plain-text invoices need the AI reader: add ANTHROPIC_API_KEY to .env."}</p>
           <button class="btn btn-secondary btn-sm" type="button" id="choose">Choose a file</button>
         </div>
       </article>
@@ -578,8 +678,8 @@
 
     const walletCard = `<article class="card stack">
       <div class="card-head" style="margin-bottom:0"><h2>Your wallet</h2>${w.address ? `<button class="btn btn-secondary btn-sm" type="button" data-copy="${esc(w.address)}" data-what="Address">${icon("copy")}Copy</button>` : ""}</div>
-      ${w.address ? `<div class="code-box">${esc(w.address)}</div>` : '<p class="muted">No wallet key on this computer yet.</p>'}
-      ${callout("Your own key never leaves this computer. Revoking takes effect in the next block, about one second on Celo.", "", "shield")}
+      ${w.address ? `<div class="code-box">${esc(w.address)}</div>` : `<p class="muted">No wallet key ${onWhere} yet.</p>`}
+      ${callout(`Your own key never leaves ${where}. Revoking takes effect in the next block, about one second on Celo.`, "", "shield")}
       <dl class="kv">
         ${keyless ? (S.proof && proofOk
           ? `<dt>Textile proof valid until</dt><dd><time>${new Date(S.proof.validUntil).toDateString() === new Date().toDateString() ? new Date(S.proof.validUntil).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" }) : fmtTime(S.proof.validUntil)}</time></dd>`
@@ -588,6 +688,23 @@
         <dt>ERC-8004 identity</dt><dd>${w.agentId ? (w.agentPage ? `<a href="${esc(w.agentPage)}" target="_blank" rel="noopener">Agent #${esc(w.agentId)}</a>` : `Agent #${esc(w.agentId)}`) : w.activated ? "Naira Reach" : "After activation"}</dd>
       </dl>
     </article>`;
+
+    const placeCard = HOSTED
+      ? `<section class="card stack" aria-label="This browser">
+          <div class="card-head" style="margin-bottom:0"><h2>Kept in this browser</h2>${badge("Locked with your password", "neutral")}</div>
+          <p class="small muted">Your wallet key, the agent's key and your records are kept here, locked. Download the locked backup and keep it somewhere safe: with it and your password you can open Send in any browser.</p>
+          <div class="row"><button class="btn btn-secondary" id="backup-send" type="button">${icon("download")}Download locked backup</button><button class="btn btn-secondary" id="lock-send" type="button">${icon("lock")}Lock Send</button></div>
+        </section>`
+      : `<section class="card stack" aria-label="Move to the online site">
+          <div class="card-head" style="margin-bottom:0"><h2>Move to the online site</h2>${badge("Same wallet", "neutral")}</div>
+          <p class="small muted">Puts this agent (your wallet key, the agent's key, your freelancers and receipts) in one file, locked with a password you choose. On the online site, open Send and choose <strong>Bring your agent from your laptop</strong>. Use one place at a time: payouts made in one don't show in the other.</p>
+          <form class="form-grid" id="export-form" novalidate>
+          <input type="text" name="username" value="Naira Reach Send" autocomplete="username" hidden>
+            <div class="field"><label for="x-pw">Password</label><input class="input" type="password" id="x-pw" name="password" autocomplete="new-password"></div>
+            <div class="field"><label for="x-pw2">Repeat it</label><input class="input" type="password" id="x-pw2" name="repeat" autocomplete="new-password"></div>
+            <div class="wide"><button class="btn btn-secondary" id="x-go" type="submit" ${w.hasKey ? "" : "disabled"}>${icon("download")}Download the locked file</button></div>
+          </form>
+        </section>`;
 
     if (!ses) {
       const ready = w.hasKey && w.activated;
@@ -603,7 +720,7 @@
             <div class="field"><label for="g-cngn">Naira per week (₦)</label><input class="input mono" id="g-cngn" name="cngnPerWeek" inputmode="numeric" value="300,000"></div>
             <div class="field"><label for="g-days">Lasts (days)</label><input class="input mono" id="g-days" name="days" inputmode="numeric" value="7"></div>
             <div class="wide stack">
-              <p class="small muted">It may only approve USD₮, swap on Textile FX, and send cNGN and gas money. Everything else is refused onchain. You sign this with your own key, on this computer.</p>
+              <p class="small muted">It may only approve USD₮, swap on Textile FX, and send cNGN and gas money. Everything else is refused onchain. You sign this with your own key, ${onWhere}.</p>
               <p class="small muted">Each new key is listed publicly in Altana's KeyStore, which charges a one-time fee of about <strong>10.2 CELO</strong> per key. Keep that much CELO in the wallet before you click.</p>
               <div><button class="btn btn-primary" type="submit" id="g-save" ${ready ? "" : "disabled"}>${icon("key")}Give the agent a key</button></div>
               ${ready ? "" : callout(w.hasKey ? 'Activate your wallet first, on the <a href="#/pay/overview">Overview</a>.' : 'Add your wallet key first. The <a href="#/pay/overview">Overview</a> shows how.', "neutral")}
@@ -611,7 +728,8 @@
           </form>
         </article>
         ${walletCard}
-      </section>`;
+      </section>
+      ${placeCard}`;
     }
 
     const daysLeft = Math.max(0, Math.ceil((ses.expiresAt - Date.now()) / 86400000));
@@ -647,7 +765,8 @@
         <ul class="checks">${ses.calls.map((c) => `<li><span class="ico">${icon("check")}</span><div><div class="strong">${esc(c.what)}</div><div class="small muted mono">${esc(c.detail)}</div></div><span></span></li>`).join("")}</ul>
       </article>
       ${walletCard}
-    </section>`;
+    </section>
+    ${placeCard}`;
   }
 
   // ---------- Receive: Receiving code ----------
@@ -833,7 +952,12 @@
       return;
     }
     const ses = activeSession();
-    if (!S) sideCard.innerHTML = `<span class="label">Agent</span><span class="strong">${CFG.agent && !stateError ? "Connecting…" : "Not running"}</span>`;
+    const st = HOSTED ? sendStatus() : null;
+    if (HOSTED && st !== "unlocked") {
+      sideCard.innerHTML = `<span class="label">Agent</span><span class="strong">${st === "locked" ? "Locked" : st === "none" ? "Not set up here" : "Loading…"}</span>`;
+      return;
+    }
+    if (!S) sideCard.innerHTML = `<span class="label">Agent</span><span class="strong">${(CFG.agent || HOSTED) && !stateError ? "Connecting…" : "Not running"}</span>`;
     else if (!ses) sideCard.innerHTML = `<span class="label">Agent key</span><span class="strong">${S.session && S.session.expired ? "Expired" : "Not given yet"}</span><a class="small" href="#/pay/access">Agent access</a>`;
     else {
       const days = Math.max(0, Math.ceil((ses.expiresAt - Date.now()) / 86400000));
@@ -855,7 +979,7 @@
       // The guides need neither the agent nor the keys.
       view.innerHTML = guide();
     } else if (m === "pay" && !S) {
-      view.innerHTML = CFG.agent && !stateError ? `${head({ title })}${loading("Asking the agent…")}` : agentMissing(title);
+      view.innerHTML = HOSTED ? sendSetup(title) : CFG.agent && !stateError ? `${head({ title })}${loading("Asking the agent…")}` : agentMissing(title);
     } else if (m === "get" && !R) {
       view.innerHTML = `${head({ title })}<section class="card">${callout("This page's Receive code didn't load. Reload the page.", "", "flag")}</section>`;
     } else {
@@ -872,7 +996,11 @@
     if (page !== "invoice" && INV && INV.result && !INV.paying) INV = null;
     if (page !== "freelancers") addOpen = false;
     render();
-    if (mode === "pay" && CFG.agent && (!S || Date.now() - SAt > 15000)) {
+    if (mode === "pay" && HOSTED && !window.NRSend) {
+      await loadSend().then(() => (sendLoadError = null), (e) => (sendLoadError = e.message));
+      render();
+    }
+    if (mode === "pay" && (CFG.agent || sendStatus() === "unlocked") && (!S || Date.now() - SAt > 15000)) {
       if (page === "guide" && S) return;
       await loadState();
       if (!dirty) render();
@@ -881,6 +1009,10 @@
   }
 
   // ---------- events ----------
+  view.addEventListener("change", (e) => {
+    if (e.target.id === "forget-ok") view.querySelector("#forget").disabled = !e.target.checked;
+  });
+
   view.addEventListener("input", (e) => {
     dirty = true;
     if (e.target.id === "override") {
@@ -906,6 +1038,34 @@
       return render();
     }
     switch (t.id) {
+      case "retry":
+        await loadState();
+        return render();
+      case "import-pick": {
+        const file = await pickFile(".json,application/json");
+        if (!file) return;
+        importFile = file;
+        const name = view.querySelector("#import-name");
+        if (name) name.textContent = file.name;
+        return;
+      }
+      case "forget":
+        if (!window.confirm("Remove the agent from this browser? Without its locked file and password it can't be brought back.")) return;
+        window.NRSend.forget();
+        S = null;
+        toast("Removed from this browser");
+        return render();
+      case "backup-send":
+        return busy(t, "Preparing", async () => {
+          const text = await window.NRSend.backup();
+          download("naira-reach-agent-locked.json", JSON.parse(text));
+          toast("Locked backup downloaded. Keep it with your password.");
+        }).catch(() => {});
+      case "lock-send":
+        await window.NRSend.lock();
+        S = null;
+        toast("Send is locked");
+        return render();
       case "choose":
         return uploadInvoice(await pickFile(".json,.txt,.md,application/json,text/plain"));
       case "clear":
@@ -1023,6 +1183,41 @@
         render();
       }).catch(() => {});
     }
+    if (form.id === "unlock-form") {
+      await busy(form.querySelector("#u-go"), "Unlocking", async () => {
+        await (await loadSend()).unlock(data.password);
+        form.reset();
+        await loadState();
+        render();
+      }).catch(() => {});
+    }
+    if (form.id === "import-form") {
+      await busy(form.querySelector("#i-go"), "Opening", async () => {
+        if (!importFile) throw new Error("Choose the locked file first.");
+        await (await loadSend()).importFile(await readText(importFile), data.password);
+        importFile = null;
+        toast("Your agent is in this browser");
+        await loadState();
+        render();
+      }).catch(() => {});
+    }
+    if (form.id === "new-form") {
+      await busy(form.querySelector("#n-go"), "Creating", async () => {
+        if (data.password !== data.repeat) throw new Error("The two passwords don't match.");
+        await (await loadSend()).create(data.password, data.clientName);
+        toast("Your wallet is ready. Download the locked backup from Agent access.");
+        await loadState();
+        render();
+      }).catch(() => {});
+    }
+    if (form.id === "export-form") {
+      await busy(form.querySelector("#x-go"), "Locking", async () => {
+        const sealed = await api("POST", "/export", data);
+        download("naira-reach-agent-locked.json", sealed);
+        form.reset();
+        toast("Locked file downloaded. Open it on the online site with the same password.");
+      }).catch(() => {});
+    }
     if (form.id === "g-form") {
       await busy(form.querySelector("#g-save"), "Granting… about a minute", async () => {
         await api("POST", "/session/grant", data);
@@ -1068,6 +1263,6 @@
     const open = sb.classList.toggle("open");
     e.currentTarget.setAttribute("aria-expanded", String(open));
   });
-  if (!location.hash) location.replace(CFG.agent ? "#/pay/overview" : "#/get/code");
+  if (!location.hash) location.replace("#/pay/overview");
   go();
 })();
