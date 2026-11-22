@@ -29,7 +29,7 @@ Client (the one paying)
   freelancer list              Show approved freelancers and what has been paid
 
 Agent
-  pay <invoice>                Settle an invoice  [--dry-run] [--direct] [--approve-holds]
+  pay <invoice>                Settle an invoice  [--dry-run] [--direct] [--relay] [--approve-holds]
 
 Freelancer (the one getting paid)
   freelancer keys              Make your private receiving code (share the st:celo:… line with clients)
@@ -170,7 +170,7 @@ async function pay(argv: string[]) {
   const { values, positionals } = parseArgs({
     args: argv,
     allowPositionals: true,
-    options: { "dry-run": { type: "boolean" }, direct: { type: "boolean" }, "approve-holds": { type: "boolean" } },
+    options: { "dry-run": { type: "boolean" }, direct: { type: "boolean" }, relay: { type: "boolean" }, "approve-holds": { type: "boolean" } },
   });
   const invoicePath = positionals[0];
   if (!invoicePath) throw new ConfigError("Usage: pay <invoice.json|invoice.txt> [--dry-run]");
@@ -189,7 +189,12 @@ async function pay(argv: string[]) {
       )
     : dryRun && !hasAgentSession()
       ? undefined
-      : new AltanaExecutor(loadAgentSession(), code);
+      : new AltanaExecutor(
+          loadAgentSession(),
+          code,
+          // With the wallet's key here, the wallet sends the payment itself, tagged (see selfsubmit.ts).
+          process.env.CLIENT_ADMIN_PRIVATE_KEY?.trim() && !values.relay ? { adminKey: privateKey("CLIENT_ADMIN_PRIVATE_KEY", ""), rpcUrl } : undefined,
+        );
   const anthropicKey = settings.anthropicKey();
 
   const outcome = await payInvoice(invoiceFromPath(invoicePath), {

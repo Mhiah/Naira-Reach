@@ -13,6 +13,7 @@ import {
 } from "@altananetwork/sdk";
 import { parseUnits, type Address, type Hex } from "viem";
 import { generatePrivateKey, privateKeyToAccount } from "viem/accounts";
+import { withSelfSubmit } from "./selfsubmit.ts";
 import { ERC5564_ANNOUNCER } from "./announcer.ts";
 import { CELO_CHAIN_ID, DECIMALS, TEXTILE_REACTOR, TOKENS } from "./celo.ts";
 import type { Call } from "./executor.ts";
@@ -149,15 +150,18 @@ export async function refreshTakerProof(adminKey: Hex) {
  * key (for example announcing a payout the agent's key wasn't allowed to announce).
  * Every call carries the attribution tag.
  */
-export async function walletExecute(adminKey: Hex, calls: Call[], code: string | null) {
+export async function walletExecute(adminKey: Hex, calls: Call[], code: string | null, selfSubmit?: { rpcUrl: string; code: string }) {
   const { client, wallet, signer } = await setupClientWallet(adminKey);
-  const result = await client.execute({
-    wallet,
-    signer,
-    // No tag on a contract deployment: extra bytes would change the contract's address.
-    calls: calls.map((c) => ({ to: c.to, data: code ? tagCalldata(c.data, code) : c.data, value: c.value ?? 0n })),
-    feeToken: FEE_TOKENS,
-  });
+  const run = () =>
+    client.execute({
+      wallet,
+      signer,
+      // No tag on a contract deployment: extra bytes would change the contract's address.
+      calls: calls.map((c) => ({ to: c.to, data: code ? tagCalldata(c.data, code) : c.data, value: c.value ?? 0n })),
+      feeToken: FEE_TOKENS,
+    });
+  // The wallet sends it itself, tagged, so the transaction is from the agent wallet (see selfsubmit.ts).
+  const result = selfSubmit ? await withSelfSubmit({ adminKey, rpcUrl: selfSubmit.rpcUrl, code: selfSubmit.code, relayUrl: CELO.relayUrl! }, run) : await run();
   return { status: result.status, hash: result.transactionHash as Hex | undefined };
 }
 

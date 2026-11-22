@@ -35,6 +35,7 @@ const agent = createAgent({
   textile: new TextileClient(TEXTILE_API_URL, undefined, viaProxy),
   textileKeyless: true,
   reader: createPublicClient({ chain: celo, transport: http(rpcUrl) }) as PublicClient,
+  rpcUrl,
   adminKey: () => {
     const k = vault.store.read<{ privateKey?: Hex } | null>("admin.key", null);
     if (!k?.privateKey) throw new AgentError(400, "There's no wallet key in this browser.");

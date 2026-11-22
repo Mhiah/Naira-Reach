@@ -11,6 +11,10 @@ import { celo } from "viem/chains";
 import { TOKENS, USDT_FEE_CURRENCY } from "./celo.ts";
 import { loadStoredProof, signTakerProof, type TakerProof } from "./proof.ts";
 import { tagCalldata } from "./tag.ts";
+import { withSelfSubmit } from "./selfsubmit.ts";
+
+/** The wallet's own key and RPC, for sending signed Altana payments from the wallet itself. */
+export type SelfSubmit = { adminKey: Hex; rpcUrl: string };
 
 export type Call = { to: Address; data: Hex; value?: bigint; label: string };
 
@@ -36,19 +40,28 @@ export class AltanaExecutor implements Executor {
   private readonly session: Session;
   private readonly code: string;
 
-  constructor(session: Session, code: string) {
+  private readonly selfSubmit?: SelfSubmit;
+
+  /**
+   * `selfSubmit`: the wallet's own key and RPC. With it, the wallet sends the signed
+   * payment itself (tagged), so the transaction is from the agent wallet; see selfsubmit.ts.
+   */
+  constructor(session: Session, code: string, selfSubmit?: SelfSubmit) {
     this.session = session;
     this.code = code;
     this.address = session.walletAddress;
+    this.selfSubmit = selfSubmit;
   }
 
   async send(calls: Call[]): Promise<SendResult> {
-    const result = await this.client.execute({
-      session: this.session,
-      calls: calls.map((c) => ({ to: c.to, data: tagCalldata(c.data, this.code), value: c.value ?? 0n })),
-      // Relay fee in USD₮ if the relay accepts it, else CELO; either way inside the session's caps.
-      feeToken: [TOKENS.USDT, NATIVE_TOKEN],
-    });
+    const run = () =>
+      this.client.execute({
+        session: this.session,
+        calls: calls.map((c) => ({ to: c.to, data: tagCalldata(c.data, this.code), value: c.value ?? 0n })),
+        // Relay fee in USD₮ if the relay accepts it, else CELO; either way inside the session's caps.
+        feeToken: [TOKENS.USDT, NATIVE_TOKEN],
+      });
+    const result = this.selfSubmit ? await withSelfSubmit({ ...this.selfSubmit, code: this.code, relayUrl: CELO.relayUrl! }, run) : await run();
     return { hashes: result.transactionHash ? [result.transactionHash] : [], status: result.status };
   }
 

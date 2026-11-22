@@ -73,6 +73,7 @@ export function createWebApp(o: WebOptions) {
     textile: o.textile,
     textileKeyless: !settings.textileKey(),
     reader: o.reader,
+    rpcUrl: settings.rpcUrl(),
     adminKey: () => privateKey("CLIENT_ADMIN_PRIVATE_KEY", "Add your wallet key to .env first: npm run reach -- wallet new-key"),
     hasAdminKey: () => Boolean(process.env.CLIENT_ADMIN_PRIVATE_KEY?.trim()),
     attributionCode: code,

@@ -50,6 +50,11 @@ export type AgentEnv = {
   maxInvoiceUsdt: number;
   gasTopUpUsdt: number;
   announcer?: Address;
+  /**
+   * The Celo RPC the wallet sends from. With it and the wallet's key, payments and
+   * wallet calls are sent by the wallet itself, tagged, instead of Altana's relayer.
+   */
+  rpcUrl?: string;
   extractor?: (redactedText: string) => Promise<Invoice>;
   actions?: Partial<Actions>;
   now?: () => number;
@@ -506,6 +511,8 @@ function defaultActions(env: AgentEnv): Actions {
     if (!c) throw new AgentError(400, "Add your attribution code first.");
     return c;
   };
+  // The wallet sends its own transactions when its key is here (see selfsubmit.ts).
+  const selfSubmit = () => Boolean(env.rpcUrl) && env.hasAdminKey();
   return {
     walletSetup: async () => {
       const { result } = await activateClientWallet(env.adminKey());
@@ -514,13 +521,13 @@ function defaultActions(env: AgentEnv): Actions {
     grant: (limits) => grantAgentSession(env.adminKey(), { ...limits, announcer: env.announcer }),
     revoke: () => revokeAgentSession(env.adminKey()),
     proofRefresh: () => refreshTakerProof(env.adminKey()),
-    walletCalls: (calls, opts) => walletExecute(env.adminKey(), calls, opts.tag ? code() : null),
+    walletCalls: (calls, opts) => walletExecute(env.adminKey(), calls, opts.tag ? code() : null, selfSubmit() ? { rpcUrl: env.rpcUrl!, code: code() } : undefined),
     pay: async (invoice, opts) => {
       // Textile's wallet proof lasts about 11 hours. With the client's key at hand, renew it rather than fail.
       const proof = storedProofInfo();
       if (env.textileKeyless && env.hasAdminKey() && (!proof || proof.validUntil <= Date.now())) await refreshTakerProof(env.adminKey());
       return payInvoice(invoice, {
-        executor: new AltanaExecutor(loadAgentSession(), code()),
+        executor: new AltanaExecutor(loadAgentSession(), code(), selfSubmit() ? { adminKey: env.adminKey(), rpcUrl: env.rpcUrl! } : undefined),
         textile: env.textile,
         textileKeyless: env.textileKeyless,
         reader: env.reader,
