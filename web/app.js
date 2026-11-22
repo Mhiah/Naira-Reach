@@ -266,33 +266,35 @@
         </details>
       </section>`;
     }
-    return `${head({ title: "Set up Send", lede: "Send runs in this browser: the agent pays invoices from your own wallet, within the limits you set." })}
+    return `${head({ title: "Set up Send", lede: "Create a wallet in this browser. The agent pays your freelancers' invoices from it, within the limits you set." })}
     <section class="grid-2" aria-label="Set up Send">
       <article class="card stack">
-        <div class="card-head" style="margin-bottom:0"><h2>Bring your agent from your laptop</h2>${badge("Keeps your wallet", "neutral")}</div>
-        <ol class="checks">
-          <li><span class="ico todo">1</span><div><div class="strong">On your laptop, open Naira Reach</div><div class="small muted">Agent access, then <strong>Move to the online site</strong></div></div><span></span></li>
-          <li><span class="ico todo">2</span><div><div class="strong">Choose a password and download the locked file</div></div><span></span></li>
-          <li><span class="ico todo">3</span><div><div class="strong">Choose that file here, with the same password</div></div><span></span></li>
-        </ol>
-        <form class="stack" id="import-form" novalidate>
-          <input type="text" name="username" value="Naira Reach Send" autocomplete="username" hidden>
-          <div class="field"><span class="field-label">Locked file</span><div class="row"><button class="btn btn-secondary btn-sm" id="import-pick" type="button">${icon("upload")}Choose file</button><span class="small muted" id="import-name">${importFile ? esc(importFile.name) : "No file chosen"}</span></div></div>
-          <div class="field"><label for="i-pw">Password</label><input class="input" type="password" id="i-pw" name="password" autocomplete="current-password"></div>
-          <div><button class="btn btn-primary" id="i-go" type="submit">Open my agent</button></div>
-        </form>
-      </article>
-      <article class="card stack">
-        <div class="card-head" style="margin-bottom:0"><h2>Start a new wallet here</h2></div>
-        <p class="small muted">A new wallet key is made in this browser. Altana's one-time fees take about <strong>21 CELO</strong> (10.2 to activate the wallet, 10.2 for the agent's key), plus the USD₮ you pay invoices with.</p>
+        <div class="card-head" style="margin-bottom:0"><h2>Create your wallet</h2></div>
         <form class="form-grid" id="new-form" novalidate>
           <input type="text" name="username" value="Naira Reach Send" autocomplete="username" hidden>
           <div class="field wide"><label for="n-name">Your name <span class="muted">(optional)</span></label><input class="input" id="n-name" name="clientName" autocomplete="name" maxlength="40"></div>
           <div class="field wide"><label for="n-pw">Password</label><input class="input" type="password" id="n-pw" name="password" autocomplete="new-password"></div>
           <div class="field wide"><label for="n-pw2">Repeat it</label><input class="input" type="password" id="n-pw2" name="repeat" autocomplete="new-password"></div>
-          <div class="wide"><p class="small muted">At least 10 characters. Nobody can reset it for you.</p></div>
+          <div class="wide"><p class="small muted">At least 10 characters. It locks your wallet in this browser, and nobody can reset it for you.</p></div>
           <div class="wide"><button class="btn btn-primary" id="n-go" type="submit">${icon("key")}Create my wallet</button></div>
         </form>
+      </article>
+      <article class="card stack">
+        <div class="card-head" style="margin-bottom:0"><h2>What you'll need</h2></div>
+        <ol class="checks">
+          <li><span class="ico todo">1</span><div><div class="strong">A password</div><div class="small muted">You type it each time you open Send</div></div><span></span></li>
+          <li><span class="ico todo">2</span><div><div class="strong">About 21 CELO, once</div><div class="small muted">Altana's one-time fees: 10.2 to activate the wallet, 10.2 for the agent's key</div></div><span></span></li>
+          <li><span class="ico todo">3</span><div><div class="strong">USD₮ on Celo</div><div class="small muted">What you pay invoices with. Freelancers receive naira (cNGN)</div></div><span></span></li>
+        </ol>
+        <details class="small">
+          <summary>Already set up in another browser? Open your locked backup</summary>
+          <form class="stack" id="import-form" novalidate style="margin-top:12px">
+            <input type="text" name="username" value="Naira Reach Send" autocomplete="username" hidden>
+            <div class="field"><span class="field-label">Locked backup file</span><div class="row"><button class="btn btn-secondary btn-sm" id="import-pick" type="button">${icon("upload")}Choose file</button><span class="small muted" id="import-name">${importFile ? esc(importFile.name) : "No file chosen"}</span></div></div>
+            <div class="field"><label for="i-pw">Password</label><input class="input" type="password" id="i-pw" name="password" autocomplete="current-password"></div>
+            <div><button class="btn btn-secondary" id="i-go" type="submit">Open my backup</button></div>
+          </form>
+        </details>
       </article>
     </section>
     <section class="card stack">${safety}${callout('Getting paid? You don\'t need any of this. <a href="#/get/code">Go to Receive</a> to create your receiving code.', "neutral")}</section>`;
@@ -697,7 +699,7 @@
         </section>`
       : `<section class="card stack" aria-label="Move to the online site">
           <div class="card-head" style="margin-bottom:0"><h2>Move to the online site</h2>${badge("Same wallet", "neutral")}</div>
-          <p class="small muted">Puts this agent (your wallet key, the agent's key, your freelancers and receipts) in one file, locked with a password you choose. On the online site, open Send and choose <strong>Bring your agent from your laptop</strong>. Use one place at a time: payouts made in one don't show in the other.</p>
+          <p class="small muted">Puts this agent (your wallet key, the agent's key, your freelancers and receipts) in one file, locked with a password you choose. On the online site, open Send and choose <strong>Open your locked backup</strong>. Use one place at a time: payouts made in one don't show in the other.</p>
           <form class="form-grid" id="export-form" novalidate>
           <input type="text" name="username" value="Naira Reach Send" autocomplete="username" hidden>
             <div class="field"><label for="x-pw">Password</label><input class="input" type="password" id="x-pw" name="password" autocomplete="new-password"></div>
