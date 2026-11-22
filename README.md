@@ -58,10 +58,44 @@ Before any money moves, the agent runs these checks. A failed check is a **hold*
 | Checks and ledger | The approved freelancer list, the record of paid invoices, and the holds above. |
 | Textile FX client | Requests a firm, exact-output USD₮ → cNGN quote and reports the fill. Works without an API key by proving control of the paying wallet. |
 | Altana wallet and session | Sets up the client's wallet, grants and revokes the agent's limited key, and sends each payment as one atomic intent. |
-| Private payouts | Makes the freelancer's receiving code, derives a fresh address per invoice, and lets the freelancer open it later. |
+| Private payouts | Makes the freelancer's receiving code, derives a fresh address per invoice, and announces each payout on Celo (ERC-5564) so the freelancer's browser finds it with their own keys. |
 | Attribution | Adds the Loops House code to every transaction (ERC-8021) and checks it is readable onchain. |
-| Receipts | One file per payment: amount, rate, transaction links, the invoice fingerprint, and what the freelancer needs to open the payout. No personal details. |
-| Website | One site with two sides. **Send** runs the agent on the client's own computer. **Receive** runs entirely in the freelancer's browser, so their keys never leave it. |
+| Receipts | One file per payment for the client's records: amount, rate, transaction links and the invoice fingerprint. No personal details. The freelancer doesn't need it. |
+| Website | One site with two sides. **Send** runs the agent in the client's own browser, its keys locked with the client's password (or on the client's computer with `npm run app`). **Receive** runs entirely in the freelancer's browser, so their keys never leave it. |
+
+---
+
+## Privacy
+
+<table>
+<tr>
+<th width="50%">🔒 For the receiver (the freelancer)</th>
+<th width="50%">🔒 For the sender (the client)</th>
+</tr>
+<tr>
+<td valign="top">
+<ul>
+<li><b>A code, not an address.</b> The freelancer shares a receiving code (<code>st:celo:0x…</code>). It can't be looked up on Celo, so nobody can use it to see their money.</li>
+<li><b>A fresh address every time.</b> Each payout lands at a brand-new address made from that code. Nobody can link two payments to the same person or add up what they earn.</li>
+<li><b>An announcement only they can read.</b> Each payment posts a small public note on Celo (ERC-5564). Anyone can see that a private payment happened; only the freelancer's viewing key can tell it's theirs.</li>
+<li><b>Found in their own browser.</b> The Receive page checks those notes itself and shows the payout. The keys never leave the browser and nothing is sent to Naira Reach. No receipt to download or forward.</li>
+<li><b>Moving the money needs no gas token.</b> A few cents of USD₮ comes with every payout, so moving the naira doesn't reveal another wallet that bought CELO.</li>
+</ul>
+</td>
+<td valign="top">
+<ul>
+<li><b>The client's keys stay with the client.</b> The wallet key and the agent's key live in the client's browser, locked with a password only they know (PBKDF2 + AES-256-GCM). Naira Reach's server never sees a key or the password.</li>
+<li><b>The agent holds a limited key, not the wallet.</b> It may only approve, swap, pay and announce, within weekly caps, and the client can take it back at any time.</li>
+<li><b>No personal details go on-chain.</b> No names, emails or bank details in payments, announcements or receipts.</li>
+<li><b>The AI never sees personal details.</b> Emails, phone numbers, account numbers and wallet addresses are removed from an invoice before the AI reader sees it.</li>
+<li><b>Nothing to steal on the server.</b> The site's only server part passes Textile's prices along. It holds no keys and keeps no records.</li>
+</ul>
+</td>
+</tr>
+<tr>
+<td colspan="2"><b>What the public can see:</b> that the client's wallet paid someone ₦2,000. <b>What it can't see:</b> who received it, or that two payments went to the same freelancer.</td>
+</tr>
+</table>
 
 ---
 
@@ -108,11 +142,12 @@ Agent, per invoice:  pay invoice.json
   3. derive a fresh private address  (from the freelancer's code, never from the invoice)
   4. lock a Textile quote            (exact naira out, USD₮ cost shown)
   5. one atomic intent, every call tagged:
-       approve USD₮ → swap USD₮→cNGN → send cNGN → send gas money
+       approve USD₮ → swap USD₮→cNGN → send cNGN → send gas money → announce
   6. report the fill to Textile, check the tags, write the receipt
 
-Freelancer, any time:  freelancer claim receipt.json --to 0x…
-  opens the one-time address and moves the naira, paying gas in the USD₮ that came with it
+Freelancer, any time:  opens Receive → Payouts
+  the page finds the payout from the announcement, with their own keys, in their own browser,
+  and moves the naira, paying gas in the USD₮ that came with it
 ```
 
 ---
@@ -296,7 +331,7 @@ npm run reach -- session revoke
 | The agent's key | 10 USD₮ and ₦15,000 a week, 14 days, four allowed calls. Listed in Altana's KeyStore: [wallet keys and permissions](https://explorer.altana.network/account/0xB2441B175d620A3Fd5CDef28fA1c6957e6224431) |
 | First payment | ₦2,000 (test invoice TEST-002) for 1.388823 USD₮ at ₦1,440.07 per USD₮, Textile RFQ `rfq_vLcBoGXicFHjHMbv`. Approve, swap, private payout and gas money in one atomic Altana intent: [0x5131…0aea](https://celoscan.io/tx/0x5131fd5b5d14012e6a97a86a6cb4608264a52eebc1f67bf1e47a7a814d410aea) |
 | Attribution on that payment | All four inner calls carry the code. The outer transaction is sent by Altana's relayer, so the code is not at the end of its calldata and Loops House does not count it yet (see Honest limits) |
-| Tests (no network) | 47 passing: tags, private payouts, invoice privacy, every hold, keyless Textile proofs, the price guard, the full pay flow with a mocked Textile and wallet, the website's server and its protections, and the browser's key and receipt handling |
+| Tests (no network) | 61 passing: tags, private payouts, announcements and the standard announcer address, invoice privacy, every hold, keyless Textile proofs, the price guard, the full pay flow with a mocked Textile and wallet, the locked vault, the Textile proxy, the website's server and its protections, and the browser's key handling |
 | Typecheck | Clean |
 
 Run the tests yourself:
@@ -313,7 +348,7 @@ npm test
 |---|---|
 | Anyone looking at the chain | That the client's wallet swapped USD₮ for cNGN and sent cNGN to a new address. Not who owns that address, and not that it belongs to the same person as last month's payout. |
 | The client | Every payment they made, with receipts. |
-| The freelancer | Every payout made to their code, which only their viewing key can find. |
+| The freelancer | Every payout made to their code, found from Celo's announcements with their viewing key. |
 | The AI invoice reader | The invoice text with emails, phone numbers, account numbers and wallet addresses removed. |
 | An accountant or tax office | Whatever the freelancer chooses to show. The receipt's fingerprint proves which invoice a payment settled, without the invoice ever being published. |
 
@@ -329,7 +364,7 @@ Naira Reach keeps the freelancer's income private from the public. It does not h
 - **Tags through the Altana relay.** Every call inside the intent carries the attribution tag, but the relay submits the outer transaction, so the tag may not be readable on it. `pay` reports this for every transaction, and `verify <hash>` checks any one. If the relay hides it, `--direct` sends each step from a plain wallet with the tag on the outer transaction.
 - **The first activation needs CELO.** Altana's one-time registration fee can only be paid in CELO, so a wallet holding only USD₮ can't be activated. About 11 CELO covers it.
 - **cNGN is not a Celo gas token.** That is why each payout carries a few cents of USD₮, so the freelancer can move the naira without buying CELO.
-- **The receipt matters.** The freelancer needs the receipt to open a payout. An optional ERC-5564 announcer would let them find payouts from the chain alone, but there is no announcer deployed on Celo today.
+- **Announcements from the wallet, for now.** The agent's current key was granted before announcing was added, so it isn't allowed to call the announcer. Until the next key, the client's wallet announces each payout right after the agent pays it. Every new key includes the announcer.
 - **Cashing out.** cNGN is listed on Nigerian exchanges such as Busha and Quidax. Check that the one you use accepts cNGN on Celo.
 - **Receiving keys on the website live in the browser.** Clearing the browser's data removes them, which is why the site asks for a backup first. The backup file opens every payout, so it needs to be kept private.
 - **The weekly limit shown is counted from this computer's records.** The wallet enforces the real limit onchain. A payment made from somewhere else would not show in the figure.
@@ -340,8 +375,6 @@ Naira Reach keeps the freelancer's income private from the public. It does not h
 ## What's next
 
 - First live payments for a real client and freelancer, with links in Results
-- An announcer contract on Celo, so freelancers can find payouts without receipts
-- The Receive side hosted online, so a freelancer needs nothing installed
 - Recurring invoices: retainers paid on a schedule within the same session limits
 
 ---
@@ -377,7 +410,7 @@ Naira Reach keeps the freelancer's income private from the public. It does not h
 | `MAX_INVOICE_USDT` | Paying | Per-invoice dollar ceiling, default 500 |
 | `GAS_TOP_UP_USDT` | Paying | Gas money per payout, default 0.05 |
 | `CELO_RPC_URL` | Everything | Defaults to the public Celo RPC |
-| `STEALTH_ANNOUNCER_ADDRESS` | Optional | ERC-5564 announcer, if one is deployed |
+| `STEALTH_ANNOUNCER_ADDRESS` | Optional | A different ERC-5564 announcer. Default: the standard one, `0x5564…5564` |
 | `CLIENT_NAME` | Optional | First name the website greets the client with |
 | `NAIRA_REACH_PORT` | Optional | Port for the website, default 8787 |
 | `DIRECT_WALLET_PRIVATE_KEY` | `--direct` only | Optional. Without it, `--direct` sends from the client's own wallet key, the same address as the Altana wallet |
@@ -405,6 +438,7 @@ Naira Reach keeps the freelancer's income private from the public. It does not h
 | Textile FX LimitOrderReactor | `0xa9AA0a64769cBed4d3B1Ceb4Df01CdE915C235b3` |
 | USD₮ fee currency (for gas) | `0x0E2A3e05bc9A16F5292A6170456A710cb89C6f72` |
 | ERC-8004 identity registry | `0x8004A169FB4a3325136EB29fA0ceB6D2e539a432` |
+| ERC-5564 announcer (standard address, same as other chains) | `0x55649E01B5Df198D18D95b5cc5051630cfD45564` |
 
 Sources: the Textile FX address book, Celo's fee currency list, and the Altana SDK.
 
