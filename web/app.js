@@ -1003,7 +1003,7 @@
   // ---------- router ----------
   const MENUS = {
     pay: [["overview", "Overview", "home"], ["invoice", "Pay an invoice", "invoice"], ["freelancers", "Freelancers", "people"], ["access", "Agent access", "key"]],
-    get: [["code", "Receiving code", "code"], ["payouts", "Payouts", "inbox"]],
+    get: [["payouts", "Payouts", "inbox"], ["code", "Receiving code", "code"]],
   };
   const VIEWS = { pay: { overview, invoice: payInvoice, freelancers, access, guide }, get: { code, payouts, guide } };
 
