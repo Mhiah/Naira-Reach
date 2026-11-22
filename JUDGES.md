@@ -63,6 +63,7 @@ Altana's relayer sent the first payment, so Loops House didn't count it: it coun
 - [TEST-003, 0xd540…7754](https://celoscan.io/tx/0xd54014be53c8034b73d4484f32096cb2b7870a8299c075836c99459dde4f7754): **From** is the client wallet `0xB244…4431`, **To** is Altana's Orchestrator, and the input data ends with `celo_d6a0b77183c8` followed by the ERC-8021 marker `8021…8021`. The token transfers are the same shape as above: 1.387294 USD₮ to Textile's maker, 2,000 cNGN and 0.05 USD₮ to a fresh private address, Altana's fee, and the network fee paid in USD₮.
 - [Its announcement, 0xa390…f96a](https://celoscan.io/tx/0xa390411fe01da15bc0b388d9b8a70a22ebc817a71ed43ef259e6674fd2eff96a): sent the same way.
 - Loops House's **Verify tag** panel for this entry now shows **"Tag seen on-chain"** and **"ERC-8004 identity registered"**.
+- We reported the relayer problem and our workaround to Altana as a product review, logged as [altana-sdk #162](https://github.com/altananetwork/altana-sdk/issues/162).
 
 ### 2. The agent's identity and its key
 
