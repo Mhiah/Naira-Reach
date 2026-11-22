@@ -849,6 +849,7 @@
   // ---------- Receive: Payouts ----------
   const live = {}; // stealth address -> { cngn, usdt } | { error }
   let picked = null;
+  let showCashout = false;
   let scanning = null; // { done, total } while checking Celo for announcements
   let scanError = null;
 
@@ -891,9 +892,21 @@
   function payouts() {
     const keys = store.get("keys", null);
     const list = store.get("payouts", []);
-    const actions = `<a class="btn btn-secondary" href="https://app.textilecredit.com/" target="_blank" rel="noopener">${icon("external")}Withdraw NGN to bank</a>`;
+    const actions = `<button class="btn btn-secondary" type="button" id="cashout-toggle" aria-expanded="${showCashout}">${icon("info")}How to cash out</button>`;
+    const cashout = showCashout
+      ? `<section class="card stack" aria-label="How to cash out">
+          <div class="card-head" style="margin-bottom:0"><h2>Cash out to your bank</h2><button class="btn btn-secondary btn-sm" type="button" id="cashout-close">Close</button></div>
+          <ol class="checks">
+            <li><span class="ico todo">1</span><div><div class="strong">Find an exchange that takes cNGN on Celo</div><div class="small muted">Nigerian exchanges such as Busha and Quidax list cNGN. In the exchange's app, check that its cNGN deposit network includes <strong>Celo</strong>.</div></div><span></span></li>
+            <li><span class="ico todo">2</span><div><div class="strong">Move your naira there</div><div class="small muted">Copy the exchange's cNGN deposit address on Celo, paste it in <strong>Send to</strong> below, and click Move naira.</div></div><span></span></li>
+            <li><span class="ico todo">3</span><div><div class="strong">Sell and withdraw</div><div class="small muted">On the exchange, sell the cNGN for naira (cNGN is backed 1:1 by naira), then withdraw to your bank account.</div></div><span></span></li>
+          </ol>
+          ${callout("Only send to a cNGN deposit address on the <strong>Celo</strong> network. If the exchange only lists other networks, don't send there: money sent on a network it doesn't support may not arrive.", "", "flag")}
+        </section>`
+      : "";
     if (!keys) {
-      return `${head({ title: "Payouts", lede: "Open a receipt from your client to see the payout and move the naira.", actions })}
+      return `${head({ title: "Payouts", lede: "Payouts to your code show up here by themselves. Only your keys can recognise them.", actions })}
+      ${cashout}
       <section class="card">${empty("code", `<p>Create your receiving code first. Payouts can only be opened with the keys behind it.</p><a class="btn btn-primary btn-sm" href="#/get/code">Create my receiving code</a>`)}</section>`;
     }
     const state = (p) => {
@@ -919,6 +932,7 @@
           : "";
 
     return `${head({ title: "Payouts", lede: "Payouts to your code show up here by themselves. Only your keys can recognise them.", actions })}
+    ${cashout}
     <section class="grid-3" aria-label="Summary">
       <article class="card stat"><span class="label">Ready to move</span><span class="figure">${ngn(readyNgn)}</span><span class="note">${badge(plural(ready.length, "payout", "payouts"))}</span></article>
       <article class="card stat"><span class="label">Received in total</span><span class="figure">${ngn(list.reduce((a, p) => a + p.amountNgn, 0))}</span><span class="note">${plural(list.length, "payout", "payouts")}, each to its own address</span></article>
@@ -1230,6 +1244,10 @@
         }
         return;
       }
+      case "cashout-toggle":
+      case "cashout-close":
+        showCashout = t.id === "cashout-toggle" ? !showCashout : false;
+        return render();
       case "scan-now":
         return scanPayouts(true);
       case "recheck-live":

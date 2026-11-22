@@ -365,7 +365,7 @@ Naira Reach keeps the freelancer's income private from the public. It does not h
 - **The first activation needs CELO.** Altana's one-time registration fee can only be paid in CELO, so a wallet holding only USD₮ can't be activated. About 11 CELO covers it.
 - **cNGN is not a Celo gas token.** That is why each payout carries a few cents of USD₮, so the freelancer can move the naira without buying CELO.
 - **Announcements from the wallet, for now.** The agent's current key was granted before announcing was added, so it isn't allowed to call the announcer. Until the next key, the client's wallet announces each payout right after the agent pays it. Every new key includes the announcer.
-- **Cashing out.** cNGN is listed on Nigerian exchanges such as Busha and Quidax. Check that the one you use accepts cNGN on Celo.
+- **Cashing out.** Naira Reach doesn't pay into bank accounts. The freelancer moves the cNGN to an exchange that takes cNGN on Celo, sells it for naira and withdraws to their bank. Busha and Quidax list cNGN; check in the exchange's app that it accepts cNGN deposits on the Celo network before sending. The Payouts page shows these steps under **How to cash out**.
 - **Receiving keys on the website live in the browser.** Clearing the browser's data removes them, which is why the site asks for a backup first. The backup file opens every payout, so it needs to be kept private.
 - **The weekly limit shown is counted from this computer's records.** The wallet enforces the real limit onchain. A payment made from somewhere else would not show in the figure.
 - **The agent's USD₮ transfer permission is broad.** It exists only to send gas money to the payout address, and the weekly cap limits it.
