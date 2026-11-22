@@ -328,10 +328,10 @@ tr.pick:hover td, tr.picked td { background: var(--tint-primary); }
 .guide-nav { margin-top: var(--s2); }
 @media (max-width: 1100px) { .guide-card { grid-template-columns: 1fr; gap: var(--s6); } }
 
-/* Everything 5% smaller on laptop and desktop screens. Full-height parts are
+/* Everything 10% smaller on laptop and desktop screens. Full-height parts are
    stretched back so they still reach the bottom of the window. */
 @media (min-width: 900px) {
-  html { zoom: 0.95; }
-  .shell { min-height: calc(100vh / 0.95); }
-  .sidebar-inner { height: calc(100vh / 0.95); }
+  html { zoom: 0.9; }
+  .shell { min-height: calc(100vh / 0.9); }
+  .sidebar-inner { height: calc(100vh / 0.9); }
 }
