@@ -299,7 +299,7 @@
         </details>
       </article>
     </section>
-    <section class="card stack">${safety}${callout('Getting paid? You don\'t need any of this. <a href="#/get/code">Go to Receive</a> to create your receiving code.', "neutral")}</section>`;
+    <section class="card stack notes">${safety}${callout('Getting paid? You don\'t need any of this. <a href="#/get/code">Go to Receive</a> to create your receiving code.', "neutral")}</section>`;
   }
 
   // ---------- Send: Overview ----------
