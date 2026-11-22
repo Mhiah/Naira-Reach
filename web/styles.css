@@ -139,6 +139,11 @@ a { color: var(--color-primary); text-underline-offset: 3px; }
 .grid-3 { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--space-gap); }
 .grid-2 { display: grid; grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr); gap: var(--space-gap); }
 .grid-2-even { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-gap); }
+.grid-wide { display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 1fr); gap: var(--space-gap); }
+/* Payouts list: invoice on the left, the rest centred in even columns. */
+.payouts-table { table-layout: fixed; width: 100%; }
+.payouts-table th, .payouts-table td { text-align: center; }
+.payouts-table th:first-child, .payouts-table td:first-child { text-align: left; width: 28%; }
 
 .stat { display: flex; flex-direction: column; gap: var(--s2); }
 .stat .label { font-size: var(--fs-small); color: var(--color-muted); }
@@ -240,6 +245,7 @@ details > summary:hover { color: var(--color-text); }
 @media (max-width: 900px) {
   .grid-3 { grid-template-columns: 1fr; }
   .grid-2-even { grid-template-columns: 1fr; }
+  .grid-wide { grid-template-columns: 1fr; }
   .main { padding: var(--s6); }
 }
 @media (max-width: 640px) {

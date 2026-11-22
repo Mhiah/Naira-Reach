@@ -924,16 +924,16 @@
       <article class="card stat"><span class="label">Received in total</span><span class="figure">${ngn(list.reduce((a, p) => a + p.amountNgn, 0))}</span><span class="note">${plural(list.length, "payout", "payouts")}, each to its own address</span></article>
       <article class="card stat"><span class="label">Gas money included</span><span class="figure">${usdt(gas)}<span class="unit">USD₮</span></span><span class="note">per payout, so moving it costs you nothing</span></article>
     </section>
-    <section class="grid-2" aria-label="Payouts">
+    <section class="grid-wide" aria-label="Payouts">
       <article class="card">
         <div class="card-head"><h2>Your payouts</h2><div class="row">${scanNote}<button class="btn btn-secondary btn-sm" type="button" id="scan-now" ${scanning ? "disabled" : ""}>${icon("refresh")}Check again</button></div></div>
-        ${list.length ? `<div class="table-wrap"><table>
-          <thead><tr><th>Invoice</th><th class="hide-sm">Date</th><th class="hide-sm">Address</th><th class="amount">Amount</th></tr></thead>
+        ${list.length ? `<div class="table-wrap"><table class="payouts-table">
+          <thead><tr><th>Invoice</th><th class="hide-sm">Date</th><th class="hide-sm">Address</th><th>Amount</th></tr></thead>
           <tbody>${list.map((p) => `<tr class="pick ${p.stealthAddress === picked ? "picked" : ""}" data-pick="${esc(p.stealthAddress)}" tabindex="0" aria-selected="${p.stealthAddress === picked}">
             <td><span class="strong mono">${esc(p.invoiceId)}</span><span class="sub">${label[state(p)]}</span></td>
             <td class="hide-sm"><time>${p.paidAt ? fmtDate(p.paidAt) : "–"}</time></td>
             <td class="hide-sm mono small">${esc(short(p.stealthAddress))}</td>
-            <td class="amount">${ngn(p.amountNgn)}</td>
+            <td class="mono">${ngn(p.amountNgn)}</td>
           </tr>`).join("")}</tbody>
         </table></div>` : scanning ? loading("Looking for your payouts on Celo…") : empty("inbox", "<p>No payouts yet. When a client pays your code, it shows up here by itself.</p>")}
         <p class="small muted" style="margin-top:12px">Got a receipt file from a client? <button class="btn-link" type="button" id="open-receipt">Open it</button></p>
@@ -941,9 +941,9 @@
       <article class="card stack">
         ${sel ? `<div class="card-head" style="margin-bottom:0"><h2>Move ${ngn(selLive && !selLive.error ? selLive.cngn : sel.amountNgn)}</h2>${badge(sel.invoiceId)}</div>
           ${state(sel) === "ready" ? `
-          <div class="field"><label for="to">Send to</label><input class="input mono" id="to" autocomplete="off" spellcheck="false" placeholder="0x… your wallet or exchange deposit address"></div>
+          <div class="field"><label for="to">Send to</label><input class="input mono" id="to" autocomplete="off" spellcheck="false" placeholder="0x… wallet address"></div>
           <button class="btn btn-primary" type="button" id="move">${icon("send")}Move naira</button>
-          <p class="small muted">Gas is paid from the ${usdt(selLive && !selLive.error && selLive.usdt ? selLive.usdt : sel.gasMoneyUsdt)} USD₮ that came with this payout. To get naira in your bank account, send it to Textile and use Withdraw NGN.</p>`
+          <p class="small muted">Your wallet, or an exchange that takes cNGN on Celo. Gas comes from the ${usdt(selLive && !selLive.error && selLive.usdt ? selLive.usdt : sel.gasMoneyUsdt)} USD₮ sent with this payout.</p>`
           : state(sel) === "moved" ? `<p>Moved. <a href="${esc(R.explorerTx(sel.movedTx))}" target="_blank" rel="noopener">See the transaction</a></p>`
           : state(sel) === "checking" ? loading("Checking the payout address…")
           : state(sel) === "unknown" ? `<p class="muted">Couldn't reach Celo to check this payout: ${esc(selLive.error)}</p><div><button class="btn btn-secondary btn-sm" type="button" id="recheck-live">Try again</button></div>`
