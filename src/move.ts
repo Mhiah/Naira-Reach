@@ -37,6 +37,12 @@ export async function movePayout(args: {
   const account = payoutAccount(args.payout, args.keys);
   const to = getAddress(args.to);
   if (to === account.address) throw new Error("That is the payout address itself. Send it to your own wallet or an exchange.");
+  // Token contracts can't hold money for anyone: naira sent there is gone for good.
+  const tokenContracts = [TOKENS.CNGN, TOKENS.USDT, USDT_FEE_CURRENCY].map((a) => getAddress(a));
+  if (/^0x0{40}$/i.test(to)) throw new Error("That is the empty (zero) address. Naira sent there would be lost. Paste your own wallet or your exchange's deposit address.");
+  if (tokenContracts.includes(to)) {
+    throw new Error("That is a token contract, not a wallet. Naira sent there would be lost. Paste your own wallet or your exchange's deposit address.");
+  }
   const { cngn } = await payoutBalances(args.reader, account.address);
   if (cngn === 0n) throw new Error("Nothing to move: this payout address holds no cNGN.");
 

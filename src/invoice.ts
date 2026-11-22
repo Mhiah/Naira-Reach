@@ -44,16 +44,34 @@ export function fingerprint(bytes: Uint8Array | string): Hex {
   return keccak256(typeof bytes === "string" ? toBytes(bytes) : bytes);
 }
 
+/** The most one invoice may bill: ₦1 billion. Anything larger is a typo or an attack. */
+export const MAX_INVOICE_NGN = 1_000_000_000;
+
+/**
+ * A naira amount as written: a plain decimal number (or the same as text), above
+ * zero, with at most 6 decimal places (cNGN's precision). Counted from the written
+ * digits, not with floating-point maths, which misjudges amounts like 1053773.15.
+ */
+export function parseNaira(v: unknown): number {
+  const text = typeof v === "number" ? (Number.isFinite(v) ? String(v) : "") : typeof v === "string" ? v.trim() : "";
+  if (!/^\d+(\.\d+)?$/.test(text)) throw new Error("Invoice amountNgn must be a positive number, like 150000 or 2500.50.");
+  const amount = Number(text);
+  if (!(amount > 0)) throw new Error("Invoice amountNgn must be a positive number, like 150000 or 2500.50.");
+  if ((text.split(".")[1] ?? "").length > 6) throw new Error("amountNgn has more than 6 decimal places.");
+  if (amount > MAX_INVOICE_NGN) throw new Error(`amountNgn is over ₦${MAX_INVOICE_NGN.toLocaleString("en-NG")}, the most one invoice can bill.`);
+  return amount;
+}
+
 export function validateInvoice(raw: unknown): Invoice {
   if (!raw || typeof raw !== "object") throw new Error("Invoice must be a JSON object.");
   const o = raw as Record<string, unknown>;
   const invoiceId = String(o.invoiceId ?? "").trim();
   const freelancer = String(o.freelancer ?? "").trim();
-  const amountNgn = Number(o.amountNgn);
   if (!invoiceId) throw new Error("Invoice has no invoiceId.");
   if (!freelancer) throw new Error("Invoice has no freelancer.");
-  if (!Number.isFinite(amountNgn) || amountNgn <= 0) throw new Error("Invoice amountNgn must be a positive number.");
-  if (Math.round(amountNgn * 1e6) !== amountNgn * 1e6) throw new Error("amountNgn has more than 6 decimal places.");
+  if (invoiceId.length > 120) throw new Error("Invoice id is too long.");
+  if (freelancer.length > 120) throw new Error("Freelancer name is too long.");
+  const amountNgn = parseNaira(o.amountNgn);
   return {
     invoiceId,
     freelancer,

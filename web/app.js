@@ -431,7 +431,7 @@
       <article class="card">
         <div class="card-head"><h2>Today's rate</h2><span class="small muted">Textile FX</span></div>
         ${S.rate.ok
-          ? `<div class="stat"><span class="figure">${ngn(S.rate.ngnPerUsdt.toFixed(2))}</span><span class="note">for 1 USD₮ · fee ${usdt(S.rate.feePer100Usdt)} USD₮ per 100</span></div>`
+          ? `<div class="stat"><span class="figure">${ngn(S.rate.ngnPerUsdt.toFixed(2))}</span><span class="note">for 1 USD₮ · fee ${usdt(S.rate.feePer100Usdt)} USD₮ per 100${S.rate.asOf && Date.now() - S.rate.asOf > 120000 ? ` · as of ${new Date(S.rate.asOf).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" })}` : ""}</span></div>`
           : `<div class="stat"><span class="figure">–</span><span class="note">No price right now: ${esc(S.rate.error)}</span></div>`}
         <hr class="divider">
         <h3 class="small muted" style="font-family:var(--font-body);font-weight:400;letter-spacing:0;margin-bottom:var(--s3)">Paid to each freelancer</h3>
@@ -1082,6 +1082,8 @@
     // A finished payment is cleared when you leave the page; a check in progress is kept.
     if (page !== "invoice" && INV && INV.result && !INV.paying) INV = null;
     if (page !== "freelancers") addOpen = false;
+    // Locked elsewhere (another tab, or removed): don't keep showing what was on screen.
+    if (HOSTED && window.NRSend && sendStatus() !== "unlocked") S = null;
     render();
     if (mode === "pay" && HOSTED && !window.NRSend) {
       await loadSend().then(() => (sendLoadError = null), (e) => (sendLoadError = e.message));

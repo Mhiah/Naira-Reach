@@ -168,7 +168,8 @@ export async function payInvoice(file: InvoiceFile, d: PayDeps): Promise<PayOutc
     calls: buildCalls({ quote, payout, buyAmount, allowance, gasTopUp, announcer: d.announcer }),
   };
 
-  if (quoteExpired(quote)) throw new Error("The quote expired before sending. Run the payment again for a fresh quote.");
+  // A few seconds' margin: the relay needs time to land the payment before the quote runs out.
+  if (quoteExpired(quote, Date.now(), 5_000)) throw new Error("The quote expired before sending. Run the payment again for a fresh quote.");
 
   // 7. Send.
   log(`Sending ${plan.calls.length} calls through the ${executor.kind} wallet ${executor.address}…`);
@@ -248,6 +249,15 @@ export async function reviewInvoice(file: InvoiceFile, d: ReviewDeps): Promise<R
     }
   }
 
+  if (price && price.usdtCost < TEXTILE_MIN_USDT) {
+    // Textile refuses firm quotes this small, so the payment would fail before anything is sent.
+    rows.push({
+      ok: false,
+      title: "Below Textile's smallest swap",
+      note: `Textile only swaps about ${TEXTILE_MIN_USDT} USD₮ or more at a time, about ₦${Math.ceil(price.ngnPerUsdt * TEXTILE_MIN_USDT).toLocaleString("en-NG")} today. Ask for one bigger invoice.`,
+      hold: "block",
+    });
+  }
   if (price) {
     const over = checkCost(price.usdtCost, d.maxUsdt);
     rows.push(
@@ -305,13 +315,17 @@ export async function reviewInvoice(file: InvoiceFile, d: ReviewDeps): Promise<R
   };
 }
 
+/** Textile's smallest firm quote: about 1 USD₮ (₦1,438 was the minimum on 21 Nov 2026). */
+export const TEXTILE_MIN_USDT = 1;
+
 export function assertQuote(q: FirmQuote, taker: Address, buyAmount: bigint): void {
   if (getAddress(q.quote.taker) !== getAddress(taker)) throw new Error("Quote is bound to a different wallet.");
   if (getAddress(q.quote.reactor) !== TEXTILE_REACTOR || getAddress(q.transactions.swap.to) !== TEXTILE_REACTOR) {
     throw new Error("Quote points at an unexpected contract; refusing to send.");
   }
   if (BigInt(q.quote.buyAmount) < buyAmount) throw new Error("Quote delivers less naira than the invoice.");
-  if (q.transactions.swap.value !== "0" && BigInt(q.transactions.swap.value) !== 0n) throw new Error("Swap unexpectedly carries CELO.");
+  if (q.transactions.swap.value !== undefined && q.transactions.swap.value !== "0" && BigInt(q.transactions.swap.value) !== 0n) throw new Error("Swap unexpectedly carries CELO.");
+  if (q.transactions.swap.chainId !== undefined && Number(q.transactions.swap.chainId) !== CELO_CHAIN_ID) throw new Error("Quote is for a different network; refusing to send.");
 }
 
 export function buildCalls(a: {

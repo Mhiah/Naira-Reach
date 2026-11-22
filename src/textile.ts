@@ -130,6 +130,12 @@ export function parseQuote(data: Record<string, unknown>): FirmQuote {
   const reactor = quote.reactor;
   const taker = quote.taker;
   if (!reactor || !taker) throw new TextileError("Textile quote is missing reactor or taker.");
+  // Amounts must be whole numbers of the tokens' smallest units, and the expiry a real time.
+  for (const k of ["sellAmount", "buyAmount", "feeAmount", "takerPays"] as const) {
+    if (!/^\d+$/.test(String(quote[k] ?? ""))) throw new TextileError(`Textile quote has an unreadable ${k}.`);
+  }
+  if (BigInt(quote.takerPays!) === 0n || BigInt(quote.buyAmount!) === 0n) throw new TextileError("Textile quote is for nothing.");
+  if (Number.isNaN(Date.parse(String(quote.expiresAt)))) throw new TextileError("Textile quote has no readable expiry.");
   return {
     rfqId: data.rfqId,
     claimToken: data.claimToken,
@@ -151,6 +157,8 @@ export function parseQuote(data: Record<string, unknown>): FirmQuote {
   };
 }
 
-export function quoteExpired(q: FirmQuote, now = Date.now()): boolean {
-  return now >= Date.parse(q.quote.expiresAt);
+/** Expired, or too close to expiring to be sent safely (`marginMs`). An unreadable time counts as expired. */
+export function quoteExpired(q: FirmQuote, now = Date.now(), marginMs = 0): boolean {
+  const t = Date.parse(q.quote.expiresAt);
+  return Number.isNaN(t) || now + marginMs >= t;
 }

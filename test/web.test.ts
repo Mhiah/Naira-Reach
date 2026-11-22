@@ -257,6 +257,18 @@ describe("invoices", () => {
     expect(v.rows[5]).toMatchObject({ ignored: true, ok: false });
   });
 
+  it("stops an invoice below Textile's smallest swap before anything is sent", async () => {
+    seedSession(200, 300_000);
+    saveFreelancers([ada()]);
+    const v = (await upload("small.json", JSON.stringify({ invoiceId: "INV-S", freelancer: "ada", amountNgn: 1000 }))).json();
+    const row = v.rows.find((x: { title: string }) => x.title === "Below Textile's smallest swap");
+    expect(row).toMatchObject({ ok: false, hold: "block" });
+    expect(row.note).toContain("₦1,44");
+    expect(v.canOverride).toBe(false);
+    const ok = (await upload("ok.json", JSON.stringify({ invoiceId: "INV-T", freelancer: "ada", amountNgn: 2000 }))).json();
+    expect(ok.rows.some((x: { title: string }) => x.title === "Below Textile's smallest swap")).toBe(false);
+  });
+
   it("holds an unknown payee, records it, and offers no way to pay", async () => {
     seedSession(200, 300_000);
     saveFreelancers([ada()]);

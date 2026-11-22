@@ -158,18 +158,26 @@ export function createAgent(env: AgentEnv) {
     }
   }
 
-  async function rate(): Promise<Rate> {
-    if (rateCache && now() - rateCache.at < 60_000) return rateCache.value;
+  async function rate(): Promise<Rate & { asOf: number }> {
+    if (rateCache && now() - rateCache.at < 60_000) return { ...rateCache.value, asOf: rateCache.at };
     const sample = 100_000;
-    const p = await withTimeout(
-      env.textile.preview({ chainId: CELO_CHAIN_ID, sellToken: TOKENS.USDT, buyToken: TOKENS.CNGN, buyAmount: parseUnits(String(sample), DECIMALS.CNGN) }),
-      8000,
-    );
-    const pays = Number(formatUnits(BigInt(p.takerPays), DECIMALS.USDT));
-    const fee = Number(formatUnits(BigInt(p.feeAmount || "0"), DECIMALS.USDT));
-    const value = { ngnPerUsdt: sample / pays, feePer100Usdt: (fee / pays) * 100 };
-    rateCache = { at: now(), value };
-    return value;
+    const ask = () =>
+      withTimeout(
+        env.textile.preview({ chainId: CELO_CHAIN_ID, sellToken: TOKENS.USDT, buyToken: TOKENS.CNGN, buyAmount: parseUnits(String(sample), DECIMALS.CNGN) }),
+        15_000,
+      );
+    try {
+      // Textile (and the site's proxy, from cold) can be slow: one more try before giving up.
+      const p = await ask().catch(ask);
+      const pays = Number(formatUnits(BigInt(p.takerPays), DECIMALS.USDT));
+      const fee = Number(formatUnits(BigInt(p.feeAmount || "0"), DECIMALS.USDT));
+      rateCache = { at: now(), value: { ngnPerUsdt: sample / pays, feePer100Usdt: (fee / pays) * 100 } };
+      return { ...rateCache.value, asOf: rateCache.at };
+    } catch (e) {
+      // A price from the last 30 minutes beats no price; the screen says how old it is.
+      if (rateCache && now() - rateCache.at < 30 * 60_000) return { ...rateCache.value, asOf: rateCache.at };
+      throw e;
+    }
   }
 
   async function balances(wallet: Address) {
