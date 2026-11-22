@@ -21,6 +21,7 @@
   const short = (a) => (a && a.length > 14 ? a.slice(0, 6) + "…" + a.slice(-4) : a || "");
   const esc = (s) => String(s == null ? "" : s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
   const fmtDate = (t) => new Date(t).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
+  const ago = (t) => (Date.now() - t < 60000 ? "just now" : `at ${new Date(t).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" })}`);
   const fmtTime = (t) => new Date(t).toLocaleString("en-GB", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
   const today = () => new Date().toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "long", year: "numeric" });
   const greeting = () => { const h = new Date().getHours(); return h < 12 ? "Good morning" : h < 17 ? "Good afternoon" : "Good evening"; };
@@ -42,6 +43,7 @@
     copy: '<rect x="8" y="8" width="12" height="12" rx="2"/><path d="M16 8V5a1 1 0 0 0-1-1H5a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h3"/>',
     download: '<path d="M12 4v12M7 11l5 5 5-5"/><path d="M4 20h16"/>',
     send: '<path d="M4 12h15M13 6l6 6-6 6"/>',
+    refresh: '<path d="M20 11a8 8 0 1 0-2.3 5.7M20 4v7h-7"/>',
     shield: '<path d="M12 3 4.5 6v6c0 4.4 3.2 7.9 7.5 9 4.3-1.1 7.5-4.6 7.5-9V6z"/><path d="m9 12 2 2 4-4"/>',
     plus: '<path d="M12 5v14M5 12h14"/>',
     external: '<path d="M14 4h6v6M20 4l-9 9"/><path d="M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5"/>',
@@ -376,12 +378,32 @@
         </section>`
       : "";
 
+    // Private delivery: payouts announced on Celo so freelancers find them without a receipt.
+    const d = S.delivery;
+    const delivery =
+      d && w.hasKey && w.activated && (!d.live || d.pending)
+        ? `<section class="card" aria-label="Automatic delivery">
+          <div class="spread">
+            <div>
+              <h2 style="font-size:var(--fs-card)">${d.live ? `Deliver ${plural(d.pending, "earlier payout", "earlier payouts")}` : "Turn on automatic delivery"}</h2>
+              <p class="small muted" style="margin-top:4px;max-width:640px">${
+                d.live
+                  ? "Announce them on Celo so your freelancers see them on Receive by themselves. A small Altana fee in USD₮."
+                  : "Each payout gets a small public announcement on Celo that only its freelancer's keys can recognise, so it shows up on their Receive side by itself. No receipts to send. This adds the standard ERC-5564 announcer to Celo once, then announces your earlier payouts. Small Altana fees in USD₮."
+              }</p>
+            </div>
+            <button class="btn btn-primary" type="button" id="delivery-setup">${icon("send")}${d.live ? "Deliver them" : "Turn it on"}</button>
+          </div>
+        </section>`
+        : "";
+
     return `${head({
       title: `${greeting()}${name}`,
       lede: "Your agent settles invoices in naira from your own wallet, within the limits you set.",
       actions: `<a class="btn btn-secondary" href="#/pay/access">${icon("key")}Agent access</a><a class="btn btn-primary" href="#/pay/invoice">${icon("invoice")}Pay an invoice</a>`,
     })}
     ${setup}
+    ${delivery}
     <section class="grid-3" aria-label="Summary">
       <article class="card stat">
         <span class="label">Wallet balance</span>
@@ -560,7 +582,9 @@
           <dt>Private payout address</dt><dd>${esc(short(x.payoutAddress))}</dd>
           ${x.transactions.map((t) => `<dt>Transaction</dt><dd>${txLink(t)} ${t.tagged ? badge("Tagged") : badge("Tag not seen", "neutral")}</dd>`).join("")}
         </dl>
-        ${callout(`Send ${esc(first(x.freelancer))} the receipt. It holds what they need to open the payout, and nothing personal.`)}
+        ${x.delivered
+          ? callout(`Delivered: ${esc(first(x.freelancer))} will see it on their Receive side by itself. The receipt is for your records.`, "", "shield")
+          : callout(`Send ${esc(first(x.freelancer))} the receipt. It holds what they need to open the payout, and nothing personal.`)}
         <div class="row">
           <button class="btn btn-primary" type="button" data-receipt="${esc(x.receipt)}" data-invoice="${esc(x.invoiceId)}">${icon("download")}Download receipt</button>
           <button class="btn btn-secondary" type="button" id="clear">Pay another invoice</button>
@@ -825,6 +849,44 @@
   // ---------- Receive: Payouts ----------
   const live = {}; // stealth address -> { cngn, usdt } | { error }
   let picked = null;
+  let scanning = null; // { done, total } while checking Celo for announcements
+  let scanError = null;
+
+  /** Look for payouts to this code in Celo's announcements. Only new blocks after the first time. */
+  async function scanPayouts(force) {
+    const keys = store.get("keys", null);
+    if (!keys || !R || !R.scan || scanning) return;
+    const prog = store.get("scan", {});
+    const same = prog.meta === keys.metaAddress;
+    if (!force && same && Date.now() - (prog.at || 0) < 30000) return;
+    scanning = { done: 0, total: 0 };
+    scanError = null;
+    const redraw = () => route().page === "payouts" && !dirty && render();
+    redraw();
+    try {
+      const out = await R.scan({
+        rpcUrl: RPC,
+        keys,
+        from: same ? prog.to : null,
+        onProgress: (done, total) => {
+          scanning = { done, total };
+          redraw();
+        },
+      });
+      const list = store.get("payouts", []);
+      const fresh = out.found.filter((f) => !list.some((p) => p.stealthAddress.toLowerCase() === f.stealthAddress.toLowerCase()));
+      store.set("payouts", [...fresh, ...list]);
+      store.set("scan", { meta: keys.metaAddress, to: out.scannedTo, at: Date.now() });
+      if (fresh.length) {
+        toast(`Found ${plural(fresh.length, "new payout", "new payouts")}`);
+        refreshLive(fresh);
+      }
+    } catch (e) {
+      scanError = e.shortMessage || e.message || "network error";
+    }
+    scanning = null;
+    redraw();
+  }
 
   function payouts() {
     const keys = store.get("keys", null);
@@ -846,9 +908,17 @@
     if (!picked || !list.some((p) => p.stealthAddress === picked)) picked = (ready[0] || list[0] || {}).stealthAddress || null;
     const sel = list.find((p) => p.stealthAddress === picked);
     const selLive = sel && live[sel.stealthAddress];
-    const gas = list.length ? list[0].gasMoneyUsdt : 0.05;
+    const gas = (list.find((p) => p.gasMoneyUsdt) || {}).gasMoneyUsdt || 0.05;
+    const prog = store.get("scan", {});
+    const scanNote = scanning
+      ? `<span class="small muted">${scanning.total ? `Checking Celo… ${Math.round((scanning.done / scanning.total) * 100)}%` : "Checking Celo…"}</span>`
+      : scanError
+        ? `<span class="small muted">Couldn't check Celo</span>`
+        : prog.meta === keys.metaAddress && prog.at
+          ? `<span class="small muted">Checked ${ago(prog.at)}</span>`
+          : "";
 
-    return `${head({ title: "Payouts", lede: "Open a receipt from your client to see the payout and move the naira.", actions })}
+    return `${head({ title: "Payouts", lede: "Payouts to your code show up here by themselves. Only your keys can recognise them.", actions })}
     <section class="grid-3" aria-label="Summary">
       <article class="card stat"><span class="label">Ready to move</span><span class="figure">${ngn(readyNgn)}</span><span class="note">${badge(plural(ready.length, "payout", "payouts"))}</span></article>
       <article class="card stat"><span class="label">Received in total</span><span class="figure">${ngn(list.reduce((a, p) => a + p.amountNgn, 0))}</span><span class="note">${plural(list.length, "payout", "payouts")}, each to its own address</span></article>
@@ -856,7 +926,7 @@
     </section>
     <section class="grid-2" aria-label="Payouts">
       <article class="card">
-        <div class="card-head"><h2>Your payouts</h2><button class="btn btn-secondary btn-sm" type="button" id="open-receipt">${icon("upload")}Open a receipt</button></div>
+        <div class="card-head"><h2>Your payouts</h2><div class="row">${scanNote}<button class="btn btn-secondary btn-sm" type="button" id="scan-now" ${scanning ? "disabled" : ""}>${icon("refresh")}Check again</button></div></div>
         ${list.length ? `<div class="table-wrap"><table>
           <thead><tr><th>Invoice</th><th class="hide-sm">Date</th><th class="hide-sm">Address</th><th class="amount">Amount</th></tr></thead>
           <tbody>${list.map((p) => `<tr class="pick ${p.stealthAddress === picked ? "picked" : ""}" data-pick="${esc(p.stealthAddress)}" tabindex="0" aria-selected="${p.stealthAddress === picked}">
@@ -865,14 +935,15 @@
             <td class="hide-sm mono small">${esc(short(p.stealthAddress))}</td>
             <td class="amount">${ngn(p.amountNgn)}</td>
           </tr>`).join("")}</tbody>
-        </table></div>` : empty("inbox", "<p>No payouts yet. When a client pays you, they send a receipt file. Open it here.</p>")}
+        </table></div>` : scanning ? loading("Looking for your payouts on Celo…") : empty("inbox", "<p>No payouts yet. When a client pays your code, it shows up here by itself.</p>")}
+        <p class="small muted" style="margin-top:12px">Got a receipt file from a client? <button class="btn-link" type="button" id="open-receipt">Open it</button></p>
       </article>
       <article class="card stack">
         ${sel ? `<div class="card-head" style="margin-bottom:0"><h2>Move ${ngn(selLive && !selLive.error ? selLive.cngn : sel.amountNgn)}</h2>${badge(sel.invoiceId)}</div>
           ${state(sel) === "ready" ? `
           <div class="field"><label for="to">Send to</label><input class="input mono" id="to" autocomplete="off" spellcheck="false" placeholder="0x… your wallet or exchange deposit address"></div>
           <button class="btn btn-primary" type="button" id="move">${icon("send")}Move naira</button>
-          <p class="small muted">Gas is paid from the ${usdt(sel.gasMoneyUsdt)} USD₮ that came with this payout. To get naira in your bank account, send it to Textile and use Withdraw NGN.</p>`
+          <p class="small muted">Gas is paid from the ${usdt(selLive && !selLive.error && selLive.usdt ? selLive.usdt : sel.gasMoneyUsdt)} USD₮ that came with this payout. To get naira in your bank account, send it to Textile and use Withdraw NGN.</p>`
           : state(sel) === "moved" ? `<p>Moved. <a href="${esc(R.explorerTx(sel.movedTx))}" target="_blank" rel="noopener">See the transaction</a></p>`
           : state(sel) === "checking" ? loading("Checking the payout address…")
           : state(sel) === "unknown" ? `<p class="muted">Couldn't reach Celo to check this payout: ${esc(selLive.error)}</p><div><button class="btn btn-secondary btn-sm" type="button" id="recheck-live">Try again</button></div>`
@@ -1007,7 +1078,10 @@
       await loadState();
       if (!dirty) render();
     }
-    if (mode === "get" && page === "payouts" && R) refreshLive(store.get("payouts", []));
+    if (mode === "get" && page === "payouts" && R) {
+      refreshLive(store.get("payouts", []));
+      scanPayouts(false);
+    }
   }
 
   // ---------- events ----------
@@ -1040,6 +1114,13 @@
       return render();
     }
     switch (t.id) {
+      case "delivery-setup":
+        return busy(t, "Working", async () => {
+          const r = await api("POST", "/delivery/setup", {});
+          toast(r.announced ? `Delivered ${plural(r.announced, "payout", "payouts")}. Freelancers will see them on Receive.` : "Automatic delivery is on");
+          await loadState();
+          render();
+        }).catch(() => {});
       case "retry":
         await loadState();
         return render();
@@ -1149,6 +1230,8 @@
         }
         return;
       }
+      case "scan-now":
+        return scanPayouts(true);
       case "recheck-live":
         delete live[picked];
         render();
