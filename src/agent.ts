@@ -6,10 +6,11 @@
 import { agentPageUrl } from "@altananetwork/sdk";
 import { erc20Abi, formatUnits, getAddress, parseUnits, sha256, type Address, type Hex, type PublicClient } from "viem";
 import { privateKeyToAccount } from "viem/accounts";
-import { activateClientWallet, grantAgentSession, loadAgentSession, loadClientRecord, refreshTakerProof, revokeAgentSession, storedSession } from "./altana.ts";
+import { activateClientWallet, grantAgentSession, loadAgentSession, loadClientRecord, refreshTakerProof, revokeAgentSession, sessionMayAnnounce, storedSession, walletExecute } from "./altana.ts";
+import { announceCall, announcerLive, deployCall, ERC5564_ANNOUNCER } from "./announcer.ts";
 import { CELO_CHAIN_ID, DECIMALS, ERC8004_IDENTITY_REGISTRY, EXPLORER_TX, TEXTILE_REACTOR, TOKENS } from "./celo.ts";
 import { loadFreelancers, loadHolds, loadLedger, recordHold, saveFreelancers, type Freelancer, type PaidEntry } from "./checks.ts";
-import { AltanaExecutor } from "./executor.ts";
+import { AltanaExecutor, type Call } from "./executor.ts";
 import type { Invoice, InvoiceFile } from "./invoice.ts";
 import { payInvoice, reviewInvoice, type PayOutcome } from "./pay.ts";
 import { storedProofInfo } from "./proof.ts";
@@ -31,7 +32,9 @@ export type Actions = {
   grant: (limits: { usdtPerWeek: number; cngnPerWeek: number; days: number }) => Promise<unknown>;
   revoke: () => Promise<unknown>;
   proofRefresh: () => Promise<unknown>;
-  pay: (invoice: InvoiceFile, opts: { approvedUsdt: number; approveHolds: boolean }) => Promise<PayOutcome>;
+  pay: (invoice: InvoiceFile, opts: { approvedUsdt: number; approveHolds: boolean; announce: boolean }) => Promise<PayOutcome>;
+  /** A one-off action from the client's own wallet. `tag: false` for the announcer's deployment. */
+  walletCalls: (calls: Call[], opts: { tag: boolean }) => Promise<{ status: string; hash?: Hex }>;
 };
 
 export type AgentEnv = {
@@ -60,8 +63,16 @@ const MAX_UPLOAD = 1024 * 1024;
 
 type Rate = { ngnPerUsdt: number; feePer100Usdt: number };
 type Receipt = {
+  invoice?: { amountNgn?: number };
   cost?: { usdt?: number };
-  payout?: { gasMoneyUsdt?: number };
+  payout?: {
+    gasMoneyUsdt?: number;
+    stealthAddress?: Address;
+    ephemeralPublicKey?: Hex;
+    viewTag?: Hex;
+    cngn?: number;
+    announced?: { by: "agent" | "wallet"; hash: Hex | null };
+  };
   transactions?: { hash: Hex; explorer?: string; tagged?: boolean }[];
 };
 
@@ -70,6 +81,7 @@ export function createAgent(env: AgentEnv) {
   const actions: Actions = { ...defaultActions(env), ...env.actions };
   let busy: string | undefined;
   let rateCache: { at: number; value: Rate } | undefined;
+  let liveCache: { at: number; live: boolean } | undefined;
 
   async function exclusive<T>(what: string, fn: () => Promise<T>): Promise<T> {
     if (busy) throw new AgentError(409, `Still busy with: ${busy}. Wait for it to finish.`);
@@ -180,14 +192,61 @@ export function createAgent(env: AgentEnv) {
     };
   }
 
+  // ---------- private delivery (ERC-5564 announcements) ----------
+
+  async function announcerIsLive(): Promise<boolean> {
+    if (liveCache && (liveCache.live || now() - liveCache.at < 60_000)) return liveCache.live;
+    const live = await withTimeout(announcerLive(env.reader), 8000).catch(() => false);
+    liveCache = { at: now(), live };
+    return live;
+  }
+
+  /** Paid payouts not yet announced, so their freelancer can't find them without a receipt. */
+  function unannounced() {
+    return loadLedger()
+      .map((e) => ({ name: receiptName(e.receipt), r: receiptOf(e) }))
+      .filter((x): x is { name: string; r: Receipt } => {
+        const p = x.r?.payout;
+        return Boolean(p?.stealthAddress && p.ephemeralPublicKey && p.viewTag && !p.announced);
+      });
+  }
+
+  async function announcePending(): Promise<{ announced: number; hash: Hex | null }> {
+    const pending = unannounced();
+    if (!pending.length) return { announced: 0, hash: null };
+    if (!(await announcerIsLive())) throw new AgentError(400, "Turn on automatic delivery first.");
+    const calls = pending.map(({ r }) =>
+      announceCall(
+        { stealthAddress: r.payout!.stealthAddress!, ephemeralPublicKey: r.payout!.ephemeralPublicKey!, viewTag: r.payout!.viewTag! },
+        parseUnits(String(r.payout!.cngn ?? r.invoice?.amountNgn ?? 0), DECIMALS.CNGN),
+      ),
+    );
+    const out = await actions.walletCalls(calls, { tag: true });
+    if (out.status !== "CONFIRMED") throw new Error(`The announcement is ${out.status.toLowerCase()}. Try again in a minute.`);
+    for (const { name, r } of pending) store().write(name, { ...r, payout: { ...r.payout, announced: { by: "wallet", hash: out.hash ?? null } } });
+    return { announced: pending.length, hash: out.hash ?? null };
+  }
+
+  /** One time for everyone: put the standard announcer on Celo, then announce what was paid before. */
+  async function setupDelivery() {
+    if (!(await announcerIsLive())) {
+      const out = await actions.walletCalls([deployCall()], { tag: false });
+      if (out.status !== "CONFIRMED") throw new Error(`Adding the announcer is ${out.status.toLowerCase()}. Try again in a minute.`);
+      liveCache = undefined;
+      if (!(await announcerIsLive())) throw new Error("The announcer didn't appear on Celo. Try again.");
+    }
+    return announcePending();
+  }
+
   async function state() {
     const ledger = loadLedger();
     const freelancers = loadFreelancers();
     const wallet = walletAddress();
     const client = loadClientRecord();
-    const [live, liveRate] = await Promise.all([
+    const [live, liveRate, announcer] = await Promise.all([
       wallet ? balances(wallet).then((v) => ({ ok: true as const, ...v }), (e: Error) => ({ ok: false as const, error: e.message })) : null,
       rate().then((v) => ({ ok: true as const, ...v }), (e: Error) => ({ ok: false as const, error: e.message })),
+      announcerIsLive(),
     ]);
     const proof = storedProofInfo();
     const paid = ledger.map((e) => {
@@ -236,6 +295,7 @@ export function createAgent(env: AgentEnv) {
         live,
       },
       session: sessionView(ledger),
+      delivery: { live: announcer, address: ERC5564_ANNOUNCER, pending: unannounced().length, agentAnnounces: sessionMayAnnounce() },
       proof: proof && wallet && getAddress(proof.taker) === getAddress(wallet) ? { validUntil: proof.validUntil, fresh: proof.validUntil > now() } : null,
       rate: liveRate,
       freelancers: freelancers.map((f) => {
@@ -307,7 +367,15 @@ export function createAgent(env: AgentEnv) {
     const file = inboxFile(id);
     const approvedUsdt = Number(body.approvedUsdt);
     if (!Number.isFinite(approvedUsdt) || approvedUsdt <= 0) throw new AgentError(400, "Approve a price first.");
-    const outcome = await exclusive("paying an invoice", () => actions.pay(file, { approvedUsdt, approveHolds: body.approveHolds === true }));
+    const agentAnnounces = sessionMayAnnounce() && (await announcerIsLive());
+    const outcome = await exclusive("paying an invoice", async () => {
+      const out = await actions.pay(file, { approvedUsdt, approveHolds: body.approveHolds === true, announce: agentAnnounces });
+      // The agent's key couldn't announce it: the client's wallet does, so the freelancer still finds it.
+      if (out.status === "paid" && !agentAnnounces && env.hasAdminKey() && (await announcerIsLive())) {
+        await announcePending().catch(() => undefined);
+      }
+      return out;
+    });
     switch (outcome.status) {
       case "held":
         return { status: "held", holds: outcome.holds };
@@ -325,6 +393,7 @@ export function createAgent(env: AgentEnv) {
           payoutAddress: outcome.plan.payout.stealthAddress,
           transactions: outcome.tags.map((t) => ({ hash: t.hash, explorer: EXPLORER_TX(t.hash), tagged: t.tagged })),
           receipt: receiptName(outcome.receiptPath).slice("receipts/".length),
+          delivered: Boolean(store().read<Receipt | null>(receiptName(outcome.receiptPath), null)?.payout?.announced),
         };
     }
   }
@@ -403,6 +472,9 @@ export function createAgent(env: AgentEnv) {
       await exclusive("taking the agent's key back", actions.revoke);
       return { ok: true };
     }
+    if (is("POST", "delivery", true) && id === "setup") {
+      return exclusive("turning on automatic delivery", setupDelivery);
+    }
     if (is("POST", "proof", true) && id === "refresh") {
       await exclusive("signing the Textile proof", actions.proofRefresh);
       return { ok: true };
@@ -429,6 +501,7 @@ function defaultActions(env: AgentEnv): Actions {
     grant: (limits) => grantAgentSession(env.adminKey(), { ...limits, announcer: env.announcer }),
     revoke: () => revokeAgentSession(env.adminKey()),
     proofRefresh: () => refreshTakerProof(env.adminKey()),
+    walletCalls: (calls, opts) => walletExecute(env.adminKey(), calls, opts.tag ? code() : null),
     pay: async (invoice, opts) => {
       // Textile's wallet proof lasts about 11 hours. With the client's key at hand, renew it rather than fail.
       const proof = storedProofInfo();
@@ -441,7 +514,7 @@ function defaultActions(env: AgentEnv): Actions {
         code: code(),
         maxUsdt: env.maxInvoiceUsdt,
         gasTopUpUsdt: env.gasTopUpUsdt,
-        announcer: env.announcer,
+        announcer: opts.announce ? (env.announcer ?? ERC5564_ANNOUNCER) : undefined,
         extractor: env.extractor,
         approveHolds: opts.approveHolds,
         approvedUsdt: opts.approvedUsdt,

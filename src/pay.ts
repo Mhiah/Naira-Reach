@@ -2,7 +2,7 @@
 //   read → check → derive a private payout address → lock a Textile quote for the
 //   exact naira → (one atomic intent) approve, swap USD₮→cNGN, pay cNGN + gas money
 //   → report → receipt.
-import { erc20Abi, encodeFunctionData, formatUnits, getAddress, parseAbi, parseUnits, type Address, type Hex, type PublicClient } from "viem";
+import { erc20Abi, encodeFunctionData, formatUnits, getAddress, parseUnits, type Address, type Hex, type PublicClient } from "viem";
 import { CELO_CHAIN_ID, DECIMALS, EXPLORER_TX, TEXTILE_REACTOR, TOKENS } from "./celo.ts";
 import {
   checkCost,
@@ -20,11 +20,11 @@ import {
 import { store } from "./store.ts";
 import type { Call, Executor } from "./executor.ts";
 import { readInvoice, type Invoice, type InvoiceFile } from "./invoice.ts";
-import { erc20Metadata, newStealthAddress, SCHEME_ID, type StealthPayout } from "./stealth.ts";
+import { newStealthAddress, type StealthPayout } from "./stealth.ts";
+import { announceCall } from "./announcer.ts";
 import { verifyTag } from "./tag.ts";
 import { quoteExpired, type FirmQuote, type TextileClient } from "./textile.ts";
 
-const ANNOUNCER_ABI = parseAbi(["function announce(uint256 schemeId, address stealthAddress, bytes ephemeralPubKey, bytes metadata)"]);
 
 export type PayDeps = {
   /** Needed to send. A dry run works without one. */
@@ -343,17 +343,7 @@ export function buildCalls(a: {
       label: "gas money",
     });
   }
-  if (a.announcer) {
-    calls.push({
-      to: a.announcer,
-      data: encodeFunctionData({
-        abi: ANNOUNCER_ABI,
-        functionName: "announce",
-        args: [SCHEME_ID, a.payout.stealthAddress, a.payout.ephemeralPublicKey, erc20Metadata(a.payout.viewTag, a.buyAmount)],
-      }),
-      label: "announce",
-    });
-  }
+  if (a.announcer) calls.push({ ...announceCall(a.payout, a.buyAmount), to: a.announcer });
   return calls;
 }
 
@@ -379,6 +369,8 @@ function receipt(plan: Plan, d: PayDeps, executor: Executor, hashes: Hex[], tags
       viewTag: plan.payout.viewTag,
       cngn: plan.invoice.amountNgn,
       gasMoneyUsdt: d.gasTopUpUsdt,
+      // Announced on Celo in the same transaction, so the freelancer finds it without this receipt.
+      ...(d.announcer ? { announced: { by: "agent", hash: hashes[0] ?? null } } : {}),
     },
     wallet: { kind: executor.kind, address: executor.address },
     transactions: hashes.map((h) => ({ hash: h, explorer: EXPLORER_TX(h), tagged: tags.find((t) => t.hash === h)?.tagged ?? false })),

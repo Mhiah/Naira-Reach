@@ -13,7 +13,10 @@ import {
 } from "@altananetwork/sdk";
 import { parseUnits, type Address, type Hex } from "viem";
 import { generatePrivateKey, privateKeyToAccount } from "viem/accounts";
+import { ERC5564_ANNOUNCER } from "./announcer.ts";
 import { CELO_CHAIN_ID, DECIMALS, TEXTILE_REACTOR, TOKENS } from "./celo.ts";
+import type { Call } from "./executor.ts";
+import { tagCalldata } from "./tag.ts";
 import { moveRecord, store } from "./store.ts";
 import { saveStoredProof, signTakerProof } from "./proof.ts";
 
@@ -112,7 +115,8 @@ export async function grantAgentSession(adminKey: Hex, limits: SessionLimits) {
     wallet,
     signer,
     sessionSigner,
-    permissions: agentPermissions(limits),
+    // Every new key may also announce private payouts, so freelancers find them without a receipt.
+    permissions: agentPermissions({ ...limits, announcer: limits.announcer ?? ERC5564_ANNOUNCER }),
     expiry: Math.floor(Date.now() / 1000) + limits.days * 86_400,
     feeToken: FEE_TOKENS,
   });
@@ -138,6 +142,29 @@ export async function refreshTakerProof(adminKey: Hex) {
   const proof = await signTakerProof(account, account.address, CELO_CHAIN_ID, { longLived: true });
   saveStoredProof({ ...proof, taker: account.address, chainId: CELO_CHAIN_ID });
   return proof;
+}
+
+/**
+ * Client: a one-off action from the wallet itself, signed with the client's own
+ * key (for example announcing a payout the agent's key wasn't allowed to announce).
+ * Every call carries the attribution tag.
+ */
+export async function walletExecute(adminKey: Hex, calls: Call[], code: string | null) {
+  const { client, wallet, signer } = await setupClientWallet(adminKey);
+  const result = await client.execute({
+    wallet,
+    signer,
+    // No tag on a contract deployment: extra bytes would change the contract's address.
+    calls: calls.map((c) => ({ to: c.to, data: code ? tagCalldata(c.data, code) : c.data, value: c.value ?? 0n })),
+    feeToken: FEE_TOKENS,
+  });
+  return { status: result.status, hash: result.transactionHash as Hex | undefined };
+}
+
+/** Whether the agent's current key may call the announcer itself. */
+export function sessionMayAnnounce(): boolean {
+  const s = storedSession();
+  return Boolean(s?.permissions.calls?.some((c) => "to" in c && String(c.to).toLowerCase() === ERC5564_ANNOUNCER.toLowerCase()));
 }
 
 /** Step 3 (client, any time): pull the agent's access. Effect is immediate. */

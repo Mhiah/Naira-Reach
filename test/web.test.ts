@@ -1,4 +1,4 @@
-import { mkdirSync, writeFileSync } from "node:fs";
+import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { request, createServer, type Server } from "node:http";
 import type { AddressInfo } from "node:net";
 import { join } from "node:path";
@@ -33,8 +33,10 @@ function textile() {
   });
 }
 
+let announcerCode = "0x";
 const reader = {
   readContract: async ({ address }: { address: string }) => (getAddress(address) === TOKENS.USDT ? 5_000_000n : 0n),
+  getCode: async () => announcerCode,
 } as unknown as PublicClient;
 
 async function start(actions: Partial<Actions> = {}) {
@@ -108,6 +110,7 @@ function seedSession(usdtPerWeek: number, cngnPerWeek: number) {
 const ada = () => ({ id: "ada", name: "Ada Obi", metaAddress: generateMetaKeys().metaAddress, maxInvoiceNgn: 500_000 });
 
 beforeEach(() => {
+  announcerCode = "0x";
   dir = freshState();
   payCalls = [];
   delete process.env.CLIENT_ADMIN_PRIVATE_KEY;
@@ -286,7 +289,7 @@ describe("invoices", () => {
     expect(first.json()).toMatchObject({ status: "paid", freelancer: "Ada Obi", receipt: "INV-1-1.json" });
     expect(second.status).toBe(409);
     expect(payCalls).toHaveLength(1);
-    expect(payCalls[0]!.opts).toEqual({ approvedUsdt: 104.9, approveHolds: false });
+    expect(payCalls[0]!.opts).toEqual({ approvedUsdt: 104.9, approveHolds: false, announce: false });
     expect((await call("POST", "/api/invoices/../../x/pay", { body: { approvedUsdt: 1 } })).status).not.toBe(200);
   });
 });
@@ -325,5 +328,64 @@ describe("moving the agent to the online site", () => {
   it("doesn't serve the online site's helpers on this computer", async () => {
     expect((await call("GET", "/api/textile.mjs")).status).toBe(404);
     expect((await call("GET", "/vercel.json")).status).toBe(404);
+  });
+});
+
+describe("private delivery (ERC-5564 announcements)", () => {
+  const ANNOUNCER = "0x55649E01B5Df198D18D95b5cc5051630cfD45564";
+
+  function paidReceipt(id: string, announced = false) {
+    const receipts = process.env.NAIRA_REACH_RECEIPTS!;
+    mkdirSync(receipts, { recursive: true });
+    const p = join(receipts, `${id}-1.json`);
+    const payout = { stealthAddress: "0x" + "12".repeat(20), ephemeralPublicKey: "0x02" + "34".repeat(32), viewTag: "0x56", cngn: 2000, gasMoneyUsdt: 0.05 };
+    writeFileSync(p, JSON.stringify({ invoice: { invoiceId: id, amountNgn: 2000 }, cost: { usdt: 1.39 }, payout: announced ? { ...payout, announced: { by: "agent", hash: "0x01" } } : payout, transactions: [] }));
+    recordPaid({ invoiceId: id, freelancerId: "ada", fingerprint: ("0x" + id.length) as `0x${string}`, amountNgn: 2000, paidAt: "2026-11-21T12:00:00Z", receipt: p });
+    return p;
+  }
+
+  it("adds the standard announcer once, untagged, then announces earlier payouts from the wallet", async () => {
+    const sent: { calls: { to: string; data: string }[]; tag: boolean }[] = [];
+    await start({
+      walletCalls: async (calls, opts) => {
+        sent.push({ calls, tag: opts.tag });
+        if (calls[0]!.to.toLowerCase() === "0x4e59b44847b379578588920ca78fbf26c0b4956c") announcerCode = "0x6080";
+        return { status: "CONFIRMED", hash: ("0x" + "cd".repeat(32)) as `0x${string}` };
+      },
+    });
+    const file = paidReceipt("TEST-002");
+    paidReceipt("OLD-1", true);
+    let s = (await call("GET", "/api/state")).json();
+    expect(s.delivery).toMatchObject({ live: false, pending: 1, address: ANNOUNCER });
+
+    const r = await call("POST", "/api/delivery/setup", { body: {} });
+    expect(r.json()).toEqual({ announced: 1, hash: "0x" + "cd".repeat(32) });
+    expect(sent[0]).toMatchObject({ tag: false, calls: [{ to: "0x4e59b44847b379578588920cA78FbF26c0B4956C" }] });
+    expect(sent[1]!.tag).toBe(true);
+    expect(sent[1]!.calls).toHaveLength(1);
+    expect(sent[1]!.calls[0]!.to).toBe(ANNOUNCER);
+    expect(JSON.parse(readFileSync(file, "utf8")).payout.announced).toEqual({ by: "wallet", hash: "0x" + "cd".repeat(32) });
+
+    s = (await call("GET", "/api/state")).json();
+    expect(s.delivery).toMatchObject({ live: true, pending: 0 });
+    // Nothing left to do: no second deployment, no empty announcement.
+    expect((await call("POST", "/api/delivery/setup", { body: {} })).json()).toEqual({ announced: 0, hash: null });
+    expect(sent).toHaveLength(2);
+  });
+
+  it("lets the agent announce in the payment itself once its key allows it", async () => {
+    announcerCode = "0x6080";
+    seedSession(200, 300_000);
+    const home = process.env.NAIRA_REACH_HOME!;
+    const session = JSON.parse(readFileSync(join(home, "session.json"), "utf8"));
+    session.permissions.calls.push({ to: ANNOUNCER, signature: "announce(uint256,address,bytes,bytes)" });
+    writeFileSync(join(home, "session.json"), JSON.stringify(session));
+    let opts: { announce: boolean } | undefined;
+    await start({ pay: async (_f, o) => ((opts = o), { status: "held", holds: ["test"] }) as never });
+    saveFreelancers([ada()]);
+    const up = await call("POST", "/api/invoices", { body: { name: "inv.json", data: Buffer.from(JSON.stringify({ invoiceId: "INV-9", freelancer: "Ada Obi", amountNgn: 2000 })).toString("base64") } });
+    await call("POST", `/api/invoices/${up.json().id}/pay`, { body: { approvedUsdt: 2 } });
+    expect(opts?.announce).toBe(true);
+    expect((await call("GET", "/api/state")).json().delivery.agentAnnounces).toBe(true);
   });
 });
