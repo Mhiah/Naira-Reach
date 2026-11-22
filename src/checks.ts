@@ -73,7 +73,7 @@ export const clearHold = (fp: Hex) => {
 export const recordHold = (entry: HeldEntry) =>
   store().write(HOLDS, [...loadHolds().filter((h) => h.fingerprint !== entry.fingerprint), entry].slice(-200));
 
-const norm = (s: string) => s.trim().toLowerCase();
+const norm = (s: string) => s.normalize("NFC").trim().toLowerCase().replace(/\s+/g, " ");
 
 export function findFreelancer(list: Freelancer[], who: string): Freelancer | undefined {
   const w = norm(who);

@@ -33,11 +33,17 @@ const ADDRESS_RE = /0x[a-fA-F0-9]{40}/g;
 
 /** Strip contact and banking details before any text leaves the machine. */
 export function redact(text: string): string {
-  return text
-    .replace(/[\w.+-]+@[\w-]+\.[\w.-]+/g, "[email]")
-    .replace(ADDRESS_RE, "[wallet address]")
-    .replace(/(\+?234|\b0)[789][01]\d{8}\b/g, "[phone]")
-    .replace(/\b\d{10,11}\b/g, "[account or BVN number]");
+  return (
+    text
+      .replace(/[\w.+-]+@[\w-]+\.[\w.-]+/g, "[email]")
+      .replace(ADDRESS_RE, "[wallet address]")
+      // IBANs: two letters, two check digits, then the account (written with or without spaces).
+      .replace(/\b[A-Z]{2}\d{2}(?:\s?[A-Z0-9]){11,30}\b/g, "[bank account]")
+      .replace(/(\+?234|\b0)[\s-]?[789][01]\d(?:[\s-]?\d){7}\b/g, "[phone]")
+      // Any other run of 10 or more digits, even split by spaces or dashes: account, BVN or phone numbers.
+      // Not when it continues a word or code (INV-2026-…), so invoice numbers stay readable.
+      .replace(/(?<![\w-])\+?\d(?:[\s-]?\d){9,}\b/g, "[account or BVN number]")
+  );
 }
 
 export function fingerprint(bytes: Uint8Array | string): Hex {

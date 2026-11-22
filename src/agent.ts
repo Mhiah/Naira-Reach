@@ -11,7 +11,7 @@ import { announceCall, announcerLive, deployCall, ERC5564_ANNOUNCER } from "./an
 import { CELO_CHAIN_ID, DECIMALS, ERC8004_IDENTITY_REGISTRY, EXPLORER_TX, TEXTILE_REACTOR, TOKENS } from "./celo.ts";
 import { loadFreelancers, loadHolds, loadLedger, recordHold, saveFreelancers, type Freelancer, type PaidEntry } from "./checks.ts";
 import { AltanaExecutor, type Call } from "./executor.ts";
-import type { Invoice, InvoiceFile } from "./invoice.ts";
+import { MAX_INVOICE_NGN, type Invoice, type InvoiceFile } from "./invoice.ts";
 import { payInvoice, reviewInvoice, type PayOutcome } from "./pay.ts";
 import { storedProofInfo } from "./proof.ts";
 import { parseMetaAddress } from "./stealth.ts";
@@ -432,13 +432,15 @@ export function createAgent(env: AgentEnv) {
     const base = name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "freelancer";
     let id = base;
     for (let i = 2; list.some((f) => f.id === id); i++) id = `${base}-${i}`;
+    const limitNgn = formNumber(body.maxInvoiceNgn, "Limit per invoice", { max: MAX_INVOICE_NGN, decimals: 2 });
+    const agreedNgn = formNumber(body.agreedNgn, "Fixed amount", { max: MAX_INVOICE_NGN, decimals: 2 });
     const entry: Freelancer = {
       id,
       name,
       metaAddress,
       ...(String(body.role ?? "").trim() ? { role: String(body.role).trim().slice(0, 60) } : {}),
-      ...(numberOf(body.maxInvoiceNgn) ? { maxInvoiceNgn: numberOf(body.maxInvoiceNgn) } : {}),
-      ...(numberOf(body.agreedNgn) ? { agreedNgn: numberOf(body.agreedNgn) } : {}),
+      ...(limitNgn !== undefined ? { maxInvoiceNgn: limitNgn } : {}),
+      ...(agreedNgn !== undefined ? { agreedNgn } : {}),
       ...(aliasesOf(body.aliases).length ? { aliases: aliasesOf(body.aliases) } : {}),
     };
     saveFreelancers([...list, entry]);
@@ -470,9 +472,12 @@ export function createAgent(env: AgentEnv) {
       return { ok: true };
     }
     if (is("POST", "session", true) && id === "grant") {
-      const limits = { usdtPerWeek: numberOf(body.usdtPerWeek), cngnPerWeek: numberOf(body.cngnPerWeek), days: numberOf(body.days) };
-      if (!limits.usdtPerWeek || !limits.cngnPerWeek || !limits.days) throw new AgentError(400, "Fill in all three limits.");
-      if (limits.days > 90) throw new AgentError(400, "A key can last 90 days at most.");
+      const usdtPerWeek = formNumber(body.usdtPerWeek, "USD₮ per week", { max: 1_000_000, decimals: 6 });
+      const cngnPerWeek = formNumber(body.cngnPerWeek, "Naira per week", { max: MAX_INVOICE_NGN, decimals: 2 });
+      const days = formNumber(body.days, "Days", { max: 1_000, decimals: 0 });
+      if (!usdtPerWeek || !cngnPerWeek || !days) throw new AgentError(400, "Fill in all three limits.");
+      if (days > 90) throw new AgentError(400, "A key can last 90 days at most.");
+      const limits = { usdtPerWeek, cngnPerWeek, days };
       await exclusive("giving the agent a key", () => actions.grant(limits));
       return { ok: true };
     }
@@ -545,8 +550,27 @@ function describeCall(c: { to?: Address; signature?: string }) {
 }
 
 export function numberOf(v: unknown): number {
-  const n = Number(String(v ?? "").replace(/[,\s₦]/g, ""));
+  const t = String(v ?? "").replace(/[,\s₦]/g, "");
+  if (!/^\d+(\.\d+)?$/.test(t)) return 0;
+  const n = Number(t);
   return Number.isFinite(n) && n > 0 ? n : 0;
+}
+
+/**
+ * A number typed into a form: plain digits, with commas, spaces or ₦ allowed.
+ * Empty gives undefined. Hex, exponents, negatives, too many decimals or more
+ * than `max` are refused with a message saying which field.
+ */
+export function formNumber(v: unknown, what: string, o: { max: number; decimals: number }): number | undefined {
+  const t = String(v ?? "").replace(/[,\s₦]/g, "");
+  if (!t) return undefined;
+  const m = /^(\d+)(?:\.(\d+))?$/.exec(t);
+  if (!m) throw new AgentError(400, `${what} must be a plain number, like 1,500.`);
+  if ((m[2] ?? "").length > o.decimals) throw new AgentError(400, o.decimals ? `${what} can have at most ${o.decimals} decimal places.` : `${what} must be a whole number.`);
+  const n = Number(t);
+  if (!(n > 0)) throw new AgentError(400, `${what} must be more than zero.`);
+  if (n > o.max) throw new AgentError(400, `${what} can be at most ${o.max.toLocaleString("en-US")}.`);
+  return n;
 }
 
 function aliasesOf(v: unknown): string[] {
