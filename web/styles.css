@@ -78,7 +78,7 @@ a { color: var(--color-primary); text-underline-offset: 3px; }
 }
 .brand { display: flex; flex-direction: column; gap: var(--s1); padding: 0 var(--s2); }
 .brand-name { font-family: var(--font-heading); font-weight: 700; font-size: var(--fs-card); letter-spacing: var(--heading-letter-spacing); line-height: 1.1; }
-.brand-tag { font-size: var(--fs-small); color: var(--color-muted); }
+.brand-tag { font-family: "Aref Ruqaa Ink", var(--font-heading); font-size: 12px; line-height: 1.5; color: var(--color-muted); }
 
 .mode { display: grid; grid-template-columns: 1fr 1fr; padding: var(--s1); background: var(--color-bg); border: 1px solid var(--color-border); border-radius: var(--radius-button); }
 .mode a {
@@ -111,7 +111,7 @@ a { color: var(--color-primary); text-underline-offset: 3px; }
 /* ---------- Page header ---------- */
 .page-head { display: flex; align-items: flex-end; justify-content: space-between; gap: var(--s4); flex-wrap: wrap; margin-bottom: var(--s2); }
 .page-head .date { font-family: var(--font-mono); font-variant-numeric: tabular-nums; color: var(--color-muted); font-size: var(--fs-small); margin-bottom: var(--s2); display: block; }
-.page-head .lede { color: var(--color-muted); margin-top: var(--s2); }
+.page-head .lede { font-family: "Aref Ruqaa Ink", var(--font-heading); font-size: 12px; max-width: 780px; line-height: 1.5; color: var(--color-muted); margin-top: var(--s2); }
 .actions { display: flex; gap: var(--s3); flex-wrap: wrap; }
 
 /* ---------- Buttons ---------- */

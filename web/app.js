@@ -811,7 +811,7 @@
     if (!keys) {
       return `${head({
         title: "Your receiving code",
-        lede: "Share a code with clients instead of a wallet address. Every payment lands at a brand-new address that only you can open, so nobody can add up what you earn.",
+        lede: "Give clients a code, not a wallet address. Only you can open what they send.",
       })}
       <section class="grid-2" aria-label="Receiving code">
         <article class="card stack">
@@ -828,7 +828,7 @@
     const backedUp = store.get("backedUp", false);
     return `${head({
       title: "Your receiving code",
-      lede: "Share this code with clients instead of a wallet address. Every payment lands at a brand-new address that only you can open, so nobody can add up what you earn.",
+      lede: "Give clients this code, not a wallet address. Only you can open what they send.",
     })}
     <section class="grid-2" aria-label="Receiving code">
       <article class="card stack">
