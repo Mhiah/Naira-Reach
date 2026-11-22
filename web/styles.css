@@ -78,6 +78,9 @@ a { color: var(--color-primary); text-underline-offset: 3px; }
 }
 .brand { display: flex; flex-direction: column; gap: var(--s1); padding: 0 var(--s2); }
 .brand-name { font-family: var(--font-heading); font-weight: 700; font-size: var(--fs-card); letter-spacing: var(--heading-letter-spacing); line-height: 1.1; }
+.brand-row { display: flex; align-items: center; gap: 8px; }
+.brand-row .brand-name { white-space: nowrap; }
+.brand-logo { height: 22px; width: auto; display: block; flex: none; }
 .brand-tag { font-family: "Aref Ruqaa Ink", var(--font-heading); font-size: 12px; line-height: 1.5; color: var(--color-muted); }
 
 .mode { display: grid; grid-template-columns: 1fr 1fr; padding: var(--s1); background: var(--color-bg); border: 1px solid var(--color-border); border-radius: var(--radius-button); }
