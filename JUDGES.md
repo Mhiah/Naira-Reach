@@ -56,6 +56,14 @@ This is the **Altana atomic intent**: approve, swap, payout and gas money as one
 
 This first payment was a ₦2,000 test from the team to the team's own receiving code. A payment to a real freelancer is the next step.
 
+### 1b. The same payment, sent by the agent wallet itself
+
+Altana's relayer sent the first payment, so Loops House didn't count it: it counts transactions **from the agent wallet** with the code **at the end**. Since then, the agent still signs each payment with its limited key, and the wallet sends that signed payment to Altana's Orchestrator itself, tagged.
+
+- [TEST-003, 0xd540…7754](https://celoscan.io/tx/0xd54014be53c8034b73d4484f32096cb2b7870a8299c075836c99459dde4f7754): **From** is the client wallet `0xB244…4431`, **To** is Altana's Orchestrator, and the input data ends with `celo_d6a0b77183c8` followed by the ERC-8021 marker `8021…8021`. The token transfers are the same shape as above: 1.387294 USD₮ to Textile's maker, 2,000 cNGN and 0.05 USD₮ to a fresh private address, Altana's fee, and the network fee paid in USD₮.
+- [Its announcement, 0xa390…f96a](https://celoscan.io/tx/0xa390411fe01da15bc0b388d9b8a70a22ebc817a71ed43ef259e6674fd2eff96a): sent the same way.
+- Loops House's **Verify tag** panel for this entry now shows **"Tag seen on-chain"** and **"ERC-8004 identity registered"**.
+
 ### 2. The agent's identity and its key
 
 - [Agent #10090 on 8004scan](https://8004scan.io/agents/celo/10090): "Naira Reach", registered by the wallet's first transaction.
@@ -147,7 +155,7 @@ npm run reach -- pay examples/invoice.json --dry-run
 
 | Requirement | Status |
 |---|---|
-| Tagged Textile FX conversion on Celo mainnet, in a listed corridor, in the product flow | Done: USD₮ → cNGN, [first payment](https://celoscan.io/tx/0x5131fd5b5d14012e6a97a86a6cb4608264a52eebc1f67bf1e47a7a814d410aea). The tag is on every inner call; see the attribution note below |
+| Tagged Textile FX conversion on Celo mainnet, in a listed corridor, in the product flow | Done: USD₮ → cNGN, sent by the agent wallet with the tag last: [TEST-003](https://celoscan.io/tx/0xd54014be53c8034b73d4484f32096cb2b7870a8299c075836c99459dde4f7754). Loops House's check shows "Tag seen on-chain" |
 | Local-stablecoin payment to a recipient outside the team | Next: the first payment went to the team's own code |
 | ERC-8004 identity | Done: [Agent #10090](https://8004scan.io/agents/celo/10090) |
 | A named user with a real job done | Next: comes with the real freelancer payment |
@@ -177,6 +185,7 @@ npm run reach -- pay examples/invoice.json --dry-run
 | Invoice redaction before the AI reader | `src/invoice.ts` |
 | The only server part | `web/api/textile.mjs`: an allowlisted relay to Textile, USD₮ → cNGN on Celo only |
 | Attribution tags | `src/tag.ts` |
+| The wallet sending its own signed payment, tagged | `src/selfsubmit.ts`, tested in `test/selfsubmit.test.ts` |
 
 ---
 
@@ -184,7 +193,6 @@ npm run reach -- pay examples/invoice.json --dry-run
 
 Said plainly, so nothing is a surprise:
 
-- **Attribution through Altana.** Every call inside the payment carries the Loops House code, but the outer transaction is sent by Altana's relayer, so Loops House doesn't count it yet.
 - **The real-user payment** is waiting on the freelancer.
 - **The agent announces through the client's wallet for now.** Its current key was given before announcing was added; the next key includes it.
 - **The demo video** is coming.

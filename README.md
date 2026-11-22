@@ -90,7 +90,8 @@ Everything below is live on Celo mainnet (chain 42220) and can be checked on the
 | **First payment** | ₦2,000 (test invoice TEST-002) for 1.388823 USD₮, at ₦1,440.07 per USD₮. Textile RFQ `rfq_vLcBoGXicFHjHMbv`. Approve, swap, private payout and gas money in **one atomic Altana intent**: [0x5131…0aea](https://celoscan.io/tx/0x5131fd5b5d14012e6a97a86a6cb4608264a52eebc1f67bf1e47a7a814d410aea) |
 | **Where the money went** | 1.388546 USD₮ to Textile's maker plus 0.000277 USD₮ fee. Exactly 2,000 cNGN and 0.05 USD₮ of gas money to a fresh private address, [`0x2448…9828`](https://celoscan.io/address/0x244863ede6688da2a60d2f77fd4ed9ee75729828). Nothing left behind: the wallet holds 0 cNGN and its leftover allowance to Textile is 0 |
 | **Automatic delivery** | The standard ERC-5564 announcer, deployed on Celo by Naira Reach at the same address it has on other chains: [`0x5564…5564`](https://celoscan.io/address/0x55649E01B5Df198D18D95b5cc5051630cfD45564). The ₦2,000 was announced in [0x14b4…5fc9](https://celoscan.io/tx/0x14b4850f552900f143b26ecc45e35721f5eeed7e1ab91ab3a50ca2633bed5fc9), and the Receive page found it with nothing but the receiver's own keys |
-| **Attribution** | Every call inside the payment carries the Loops House code (ERC-8021). The outer transaction is sent by Altana's relayer, so Loops House doesn't count it yet: see [Honest limits](#honest-limits) |
+| **Tagged payment from the agent wallet** | ₦2,000 (test invoice TEST-003), still signed by the agent's limited key as one atomic Altana intent, but **sent by the wallet itself** with the Loops House code as the last bytes of the transaction: [0xd540…7754](https://celoscan.io/tx/0xd54014be53c8034b73d4484f32096cb2b7870a8299c075836c99459dde4f7754). Its announcement went the same way: [0xa390…f96a](https://celoscan.io/tx/0xa390411fe01da15bc0b388d9b8a70a22ebc817a71ed43ef259e6674fd2eff96a). Loops House's own check now shows **"Tag seen on-chain"** for this entry |
+| **Attribution** | Every call inside a payment carries the Loops House code (ERC-8021), and so does the outer transaction now that the wallet sends it. The first payment (TEST-002) went through Altana's relayer, so it isn't counted; every payment since is |
 | **Tests** | 157 passing, no network needed. See [Tests](#tests) |
 | **Live checks** | Textile's live preview gave a flat ₦1,442.52 per USD₮ from ₦1,000 to ₦20,000,000, with a 0.02% fee, answering in 0.3 to 1.1 seconds. A ₦150,000 quote didn't move at all over 66 seconds of sampling |
 
@@ -162,8 +163,9 @@ Agent, per invoice: Pay an invoice
   2. run the checks                  (hold and stop if anything is off)
   3. derive a fresh private address  (from the freelancer's code, never from the invoice)
   4. lock a Textile quote            (exact naira out, USD₮ cost shown, within the approved price)
-  5. one atomic intent, every call tagged:
+  5. one atomic intent, signed by the agent's key, every call tagged:
        approve USD₮ → swap USD₮→cNGN → send cNGN → send gas money → announce
+     sent by the wallet itself, with the tag at the end, so it counts as the agent wallet's
   6. report the fill to Textile, check the tags, keep a receipt
 
 Freelancer, any time: Receive → Payouts
@@ -277,7 +279,7 @@ This side runs entirely in the freelancer's browser. No wallet or money is neede
 |---|---|
 | Activating the wallet | 10.2 CELO (Altana's one-time KeyStore fee, about 55 cents when we did it) and about 0.03 USD₮ in transaction fees |
 | Giving the agent a key | 10.2 CELO (KeyStore fee for the key) and a few cents of USD₮ |
-| Each payment | The swap price plus Textile's fee (0.02%), 0.05 USD₮ of gas money for the freelancer, and Altana's relay fee (0.008864 USD₮ on our first payment), all in USD₮ |
+| Each payment | The swap price plus Textile's fee (0.02%), 0.05 USD₮ of gas money for the freelancer, Altana's fee (0.008864 USD₮ on the first payment, 0.019557 on the second) and, now that the wallet sends the payment itself, the network fee (about 0.006 USD₮), all in USD₮ |
 
 CELO is only needed for those two registrations. Everything else is paid in USD₮.
 
@@ -362,7 +364,7 @@ npm test
 
 ## Honest limits
 
-- **Attribution through the Altana relay.** A payment through Altana is one transaction sent by Altana's relayer, with the client's wallet acting inside it. Our code is on every call inside, but Loops House looks for it at the end of an outer transaction sent by the agent's wallet, so it doesn't count these yet. `verify <hash>` checks any transaction. `--direct` sends each step from the wallet itself, tagged at the end, at the cost of not using the agent's limited key.
+- **The wallet sends its own payments.** Loops House only counts a transaction sent by the agent wallet with the code at the end, and Altana's relayer normally sends the transaction. So the agent signs each payment with its limited key as before, and the wallet submits that signed payment to Altana's Orchestrator itself, tagged (`src/selfsubmit.ts`). It checks for free first and sends nothing if the Orchestrator would refuse. Two costs follow: the wallet pays the network fee (a few US cents in USD₮), and Altana's fee in the intent is still paid. This needs the wallet's own key in the same browser, which the website has; the agent alone, without it, falls back to the relayer (`--relay` on the command line). Our first payment went through the relayer and isn't counted.
 - **Textile's smallest swap.** A firm quote must buy at least about ₦1,438 (roughly 1 USD₮). A ₦1,000 test invoice was refused by Textile before anything was sent; ₦2,000 went through. The agent now holds smaller invoices itself.
 - **The first activation needs CELO.** Altana's one-time registration fee can only be paid in CELO, so a wallet holding only USD₮ can't be activated. About 11 CELO covers it, and each new agent key needs another 10.2.
 - **cNGN isn't a Celo gas token.** That's why each payout carries a few cents of USD₮, so the freelancer can move the naira without buying CELO.
@@ -399,7 +401,7 @@ npm test
 | `proof refresh` | Client | Re-signs Textile's wallet proof, needed about every 11 hours when there is no API key |
 | `freelancer add --id --name --meta [--max] [--agreed] [--alias]` | Client | Approves a freelancer's receiving code |
 | `freelancer list` | Client | Approved freelancers and totals paid |
-| `pay <invoice> [--dry-run] [--direct] [--approve-holds]` | Agent | Settles an invoice. `--dry-run` prices it with Textile's preview and sends nothing |
+| `pay <invoice> [--dry-run] [--direct] [--relay] [--approve-holds]` | Agent | Settles an invoice. `--dry-run` prices it with Textile's preview and sends nothing. With the wallet's key in `.env`, the wallet sends the payment itself; `--relay` leaves it to Altana's relayer |
 | `freelancer keys` | Freelancer | Makes the private receiving code |
 | `freelancer claim <receipt> --to 0x…` | Freelancer | Moves a payout onward |
 | `verify <txHash>` | Anyone | Checks the attribution tag on a transaction |
@@ -459,6 +461,7 @@ Sources: the Textile FX address book, Celo's fee currency list, the Altana SDK, 
 | `src/proof.ts` | Textile's keyless wallet proof |
 | `src/altana.ts` | Client wallet and the agent's session key |
 | `src/executor.ts` | Sending through Altana (atomic) or a plain wallet |
+| `src/selfsubmit.ts` | The wallet sending its own signed Altana payment, tagged, so Loops House counts it |
 | `src/stealth.ts` | Private payout addresses (ERC-5564 scheme 1) |
 | `src/announcer.ts` | ERC-5564 announcements and the standard announcer |
 | `src/move.ts` | Moving a payout, shared by the command line and the website |
