@@ -916,6 +916,12 @@
       return l.cngn > 0 ? "ready" : p.movedTx ? "moved" : "empty";
     };
     const label = { checking: "Checking…", unknown: "Couldn't check", ready: "Ready to move", moved: "Moved", empty: "Empty" };
+    // Anyone can announce a payout with any amount, so show what is really at the address once it's checked.
+    // A payout moved from this browser keeps the amount that was in it.
+    const shownNgn = (p) => {
+      const l = live[p.stealthAddress];
+      return l && !l.error && !(p.movedTx && l.cngn === 0) ? l.cngn : p.amountNgn;
+    };
     const ready = list.filter((p) => state(p) === "ready");
     const readyNgn = ready.reduce((a, p) => a + live[p.stealthAddress].cngn, 0);
     if (!picked || !list.some((p) => p.stealthAddress === picked)) picked = (ready[0] || list[0] || {}).stealthAddress || null;
@@ -947,7 +953,7 @@
             <td><span class="strong mono">${esc(p.invoiceId)}</span><span class="sub">${label[state(p)]}</span></td>
             <td class="hide-sm"><time>${p.paidAt ? fmtDate(p.paidAt) : "–"}</time></td>
             <td class="hide-sm mono small">${esc(short(p.stealthAddress))}</td>
-            <td class="mono">${ngn(p.amountNgn)}</td>
+            <td class="mono">${ngn(shownNgn(p))}</td>
           </tr>`).join("")}</tbody>
         </table></div>` : scanning ? loading("Looking for your payouts on Celo…") : empty("inbox", "<p>No payouts yet. When a client pays your code, it shows up here by itself.</p>")}
         <p class="small muted" style="margin-top:12px">Got a receipt file from a client? <button class="btn-link" type="button" id="open-receipt">Open it</button></p>

@@ -324,3 +324,22 @@ describe("the agent's key limits, as typed into the form", () => {
     });
   }
 });
+
+describe("the payouts list on the freelancer's page", async () => {
+  // The rule as the page runs it, read straight from web/app.js.
+  const { readFileSync } = await import("node:fs");
+  const src = readFileSync(new URL("../web/app.js", import.meta.url), "utf8");
+  const body = /const shownNgn = \(p\) => \{[\s\S]*?\n    \};/.exec(src)?.[0];
+  const shownNgn = (live: Record<string, unknown>) => new Function("live", `${body}\nreturn shownNgn;`)(live) as (p: Record<string, unknown>) => number;
+
+  it("shows what is really at a payout address, so a fake announcement shows ₦0", () => {
+    expect(body).toBeTruthy();
+    const live = { "0xfake": { cngn: 0, usdt: 0 }, "0xreal": { cngn: 2000, usdt: 0.05 }, "0xmoved": { cngn: 0, usdt: 0 }, "0xdown": { error: "network error" } };
+    const show = shownNgn(live);
+    expect(show({ stealthAddress: "0xfake", amountNgn: 1_000_000 })).toBe(0);
+    expect(show({ stealthAddress: "0xreal", amountNgn: 2000 })).toBe(2000);
+    expect(show({ stealthAddress: "0xmoved", amountNgn: 150_000, movedTx: "0xabc" })).toBe(150_000);
+    expect(show({ stealthAddress: "0xdown", amountNgn: 5000 })).toBe(5000);
+    expect(show({ stealthAddress: "0xnotyet", amountNgn: 7000 })).toBe(7000);
+  });
+});
