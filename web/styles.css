@@ -223,6 +223,8 @@ td .sub { display: block; font-size: var(--fs-small); color: var(--color-muted);
   background: var(--color-bg); border: 1px solid var(--color-border); border-radius: var(--radius-button);
   padding: var(--s3) var(--s4);
 }
+.drop.drop-compact { padding: var(--s4); align-items: flex-start; text-align: left; gap: var(--s3); }
+.drop.drop-compact .btn svg { width: 16px; height: 16px; color: currentColor; }
 .callout { display: flex; gap: var(--s3); align-items: flex-start; padding: var(--s3) var(--s4); border-radius: var(--radius-button); background: var(--tint-accent); font-size: 15px; }
 .callout svg { width: 18px; height: 18px; flex: none; margin-top: 3px; color: var(--color-accent); }
 .stack { display: flex; flex-direction: column; gap: var(--s4); }

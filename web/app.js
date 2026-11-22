@@ -489,18 +489,37 @@
   function payInvoice() {
     const r = INV && INV.review;
     const reader = S.agent.aiReader ? ".json or .txt" : ".json";
+    const nextId = () => {
+      const used = new Set((S.payouts || []).map((p) => String(p.invoiceId || "").toUpperCase()));
+      const year = new Date().getFullYear();
+      for (let n = (S.payouts || []).length + 1; ; n++) {
+        const id = `INV-${year}-${String(n).padStart(3, "0")}`;
+        if (!used.has(id)) return id;
+      }
+    };
+    const create = S.freelancers.length
+      ? `<form class="form-grid" id="c-form" novalidate>
+          <div class="field wide"><label for="c-who">Freelancer</label><select class="input" id="c-who" name="freelancer">${S.freelancers.map((f) => `<option value="${esc(f.name)}">${esc(f.name)}</option>`).join("")}</select></div>
+          <div class="field"><label for="c-amt">Amount (₦)</label><input class="input mono" id="c-amt" name="amountNgn" inputmode="decimal" placeholder="150,000" autocomplete="off" required></div>
+          <div class="field"><label for="c-id">Invoice number</label><input class="input mono" id="c-id" name="invoiceId" value="${esc(nextId())}" autocomplete="off" required></div>
+          <div class="field wide"><label for="c-desc">What it's for <span class="muted">(optional)</span></label><input class="input" id="c-desc" name="description" placeholder="Four long-form articles" autocomplete="off"></div>
+          <div class="wide"><button class="btn btn-primary" id="c-go" type="submit">${icon("shield")}Check and price</button></div>
+        </form>`
+      : empty("people", `<p>Add the freelancer you're paying first, with the receiving code they gave you.</p><a class="btn btn-primary btn-sm" href="#/pay/freelancers">Add a freelancer</a>`);
     const left = `<div class="stack">
-      <article class="card">
-        <div class="card-head"><h2>Invoice</h2><span class="small muted">${reader}</span></div>
-        <div class="drop" id="drop">
-          ${icon("upload")}
-          <p class="strong">Drop an invoice here</p>
-          <p class="small muted">${S.agent.aiReader ? "Contact and bank details are removed before the AI reads it." : HOSTED ? "Online, invoices are read from .json files. Plain-text invoices need the laptop version's AI reader." : "Plain-text invoices need the AI reader: add ANTHROPIC_API_KEY to .env."}</p>
-          <button class="btn btn-secondary btn-sm" type="button" id="choose">Choose a file</button>
-        </div>
+      ${r ? "" : `<article class="card">
+        <div class="card-head"><h2>Create an invoice</h2><span class="small muted">Pay someone on your list</span></div>
+        ${create}
       </article>
+      <article class="card">
+        <div class="card-head" style="margin-bottom:0"><h2>Or use an invoice file</h2><span class="small muted">${reader}</span></div>
+        <div class="drop drop-compact" id="drop">
+          <p class="small muted">Your freelancer sent you an invoice file? Drop it here. ${S.agent.aiReader ? "Contact and bank details are removed before the AI reads it." : HOSTED ? "Online, invoices are read from .json files." : "Plain-text invoices need the AI reader: add ANTHROPIC_API_KEY to .env."}</p>
+          <button class="btn btn-secondary btn-sm" type="button" id="choose">${icon("upload")}Choose a file</button>
+        </div>
+      </article>`}
       ${r ? `<article class="card">
-        <div class="card-head"><h3>${esc(INV.fileName)}</h3>${badge(r.source === "ai" ? "Read by AI" : "Read from JSON")}</div>
+        <div class="card-head"><h3>${INV.created ? "Invoice" : esc(INV.fileName)}</h3>${badge(INV.created ? "Created here" : r.source === "ai" ? "Read by AI" : "Read from JSON")}</div>
         <dl class="kv">
           <dt>From</dt><dd style="font-family:var(--font-body)">${esc(r.invoice.freelancer)}</dd>
           <dt>Invoice</dt><dd>${esc(r.invoice.invoiceId)}</dd>
@@ -606,10 +625,10 @@
     </article>`;
   }
 
-  async function uploadInvoice(file) {
+  async function uploadInvoice(file, created = false) {
     if (!file) return;
     if (file.size > 1024 * 1024) return toast("Invoices up to 1 MB only.");
-    INV = { fileName: file.name, review: null, result: null, paying: false, override: false };
+    INV = { fileName: file.name, created, review: null, result: null, paying: false, override: false };
     view.querySelector("#drop").innerHTML = loading(`Reading ${file.name}…`);
     try {
       lastInvoiceData = await readBase64(file);
@@ -1285,6 +1304,16 @@
     e.preventDefault();
     const form = e.target;
     const data = Object.fromEntries(new FormData(form).entries());
+    if (form.id === "c-form") {
+      // Made here, it goes through exactly the same checks as an invoice file.
+      const amount = String(data.amountNgn || "").replace(/[,\s₦]/g, "");
+      const invoiceId = String(data.invoiceId || "").trim();
+      if (!/^\d+(\.\d{1,2})?$/.test(amount) || Number(amount) <= 0) return toast("Enter the amount in naira, like 150,000.");
+      if (!invoiceId) return toast("Give the invoice a number.");
+      const invoice = { invoiceId, freelancer: String(data.freelancer), amountNgn: Number(amount), ...(String(data.description || "").trim() ? { description: String(data.description).trim() } : {}), issuedAt: new Date().toISOString().slice(0, 10) };
+      const name = `${invoiceId.replace(/[^A-Za-z0-9_-]+/g, "_")}.json`;
+      return uploadInvoice(new File([JSON.stringify(invoice, null, 2)], name, { type: "application/json" }), true);
+    }
     if (form.id === "f-form") {
       await busy(form.querySelector("#f-save"), "Saving", async () => {
         await api("POST", "/freelancers", data);
