@@ -4,10 +4,10 @@ This page walks through what to check, in order, with what you should see at eac
 
 <table>
 <tr>
-<td align="center" width="25%"><b>🌐 Live site</b><br><a href="https://nairareach.myacxt.site">nairareach.myacxt.site</a></td>
-<td align="center" width="25%"><b>⛓️ First payment</b><br><a href="https://celoscan.io/tx/0x5131fd5b5d14012e6a97a86a6cb4608264a52eebc1f67bf1e47a7a814d410aea">0x5131…0aea</a></td>
-<td align="center" width="25%"><b>🪪 ERC-8004</b><br><a href="https://8004scan.io/agents/celo/10090">Agent #10090</a></td>
-<td align="center" width="25%"><b>🎬 Demo video</b><br>Coming soon</td>
+<td align="center" width="25%"><b>Live site</b><br><a href="https://nairareach.myacxt.site">nairareach.myacxt.site</a></td>
+<td align="center" width="25%"><b>First payment</b><br><a href="https://celoscan.io/tx/0x5131fd5b5d14012e6a97a86a6cb4608264a52eebc1f67bf1e47a7a814d410aea">0x5131…0aea</a></td>
+<td align="center" width="25%"><b>ERC-8004</b><br><a href="https://8004scan.io/agents/celo/10090">Agent #10090</a></td>
+<td align="center" width="25%"><b>Demo video</b><br>Coming soon</td>
 </tr>
 </table>
 
@@ -147,19 +147,19 @@ npm run reach -- pay examples/invoice.json --dry-run
 
 | Requirement | Status |
 |---|---|
-| Tagged Textile FX conversion on Celo mainnet, in a listed corridor, in the product flow | ✅ USD₮ → cNGN, [first payment](https://celoscan.io/tx/0x5131fd5b5d14012e6a97a86a6cb4608264a52eebc1f67bf1e47a7a814d410aea). The tag is on every inner call; see the attribution note below |
-| Local-stablecoin payment to a recipient outside the team | ⏳ Next: the first payment went to the team's own code |
-| ERC-8004 identity | ✅ [Agent #10090](https://8004scan.io/agents/celo/10090) |
-| A named user with a real job done | ⏳ With the real freelancer payment |
+| Tagged Textile FX conversion on Celo mainnet, in a listed corridor, in the product flow | Done: USD₮ → cNGN, [first payment](https://celoscan.io/tx/0x5131fd5b5d14012e6a97a86a6cb4608264a52eebc1f67bf1e47a7a814d410aea). The tag is on every inner call; see the attribution note below |
+| Local-stablecoin payment to a recipient outside the team | Next: the first payment went to the team's own code |
+| ERC-8004 identity | Done: [Agent #10090](https://8004scan.io/agents/celo/10090) |
+| A named user with a real job done | Next: comes with the real freelancer payment |
 
 ### Altana Agent Wallets
 
 | Requirement | Status |
 |---|---|
-| Non-custodial Altana wallet | ✅ The client's own wallet; the key stays locked in the client's browser |
-| Person-granted session key | ✅ Given on **Agent access** |
-| Spend cap, contract allowlist, expiry | ✅ Weekly USD₮ and cNGN caps, five allowed calls (four on the current key), up to 90 days, enforced onchain |
-| Revocable | ✅ **Revoke the agent's key**, effective from the next block |
+| Non-custodial Altana wallet | Done: the client's own wallet; the key stays locked in the client's browser |
+| Person-granted session key | Done: given on **Agent access** |
+| Spend cap, contract allowlist, expiry | Done: weekly USD₮ and cNGN caps, five allowed calls (four on the current key), up to 90 days, enforced onchain |
+| Revocable | Done: **Revoke the agent's key**, effective from the next block |
 
 ---
 

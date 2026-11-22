@@ -8,16 +8,16 @@ Built for **Agents Open for Business** (Loops House, on Celo), entering the **St
 
 <table>
 <tr>
-<td align="center" width="25%"><b>🌐 Live site</b><br><a href="https://nairareach.myacxt.site">nairareach.myacxt.site</a></td>
-<td align="center" width="25%"><b>⚖️ For judges</b><br><a href="JUDGES.md">JUDGES.md</a>: what to check, in order</td>
-<td align="center" width="25%"><b>🎬 Demo video</b><br>Coming soon</td>
-<td align="center" width="25%"><b>⛓️ First payment</b><br><a href="https://celoscan.io/tx/0x5131fd5b5d14012e6a97a86a6cb4608264a52eebc1f67bf1e47a7a814d410aea">₦2,000 on Celo</a></td>
+<td align="center" width="25%"><b>Live site</b><br><a href="https://nairareach.myacxt.site">nairareach.myacxt.site</a></td>
+<td align="center" width="25%"><b>For judges</b><br><a href="JUDGES.md">JUDGES.md</a>: what to check, in order</td>
+<td align="center" width="25%"><b>Demo video</b><br>Coming soon</td>
+<td align="center" width="25%"><b>First payment</b><br><a href="https://celoscan.io/tx/0x5131fd5b5d14012e6a97a86a6cb4608264a52eebc1f67bf1e47a7a814d410aea">₦2,000 on Celo</a></td>
 </tr>
 <tr>
-<td align="center"><b>🪪 Agent identity</b><br><a href="https://8004scan.io/agents/celo/10090">ERC-8004 #10090</a></td>
-<td align="center"><b>👛 Client wallet</b><br><a href="https://celoscan.io/address/0xB2441B175d620A3Fd5CDef28fA1c6957e6224431">0xB244…4431</a></td>
-<td align="center"><b>🔑 Agent's key</b><br><a href="https://explorer.altana.network/account/0xB2441B175d620A3Fd5CDef28fA1c6957e6224431">Altana explorer</a></td>
-<td align="center"><b>✅ Tests</b><br>119 passing, <code>npm test</code></td>
+<td align="center"><b>Agent identity</b><br><a href="https://8004scan.io/agents/celo/10090">ERC-8004 #10090</a></td>
+<td align="center"><b>Client wallet</b><br><a href="https://celoscan.io/address/0xB2441B175d620A3Fd5CDef28fA1c6957e6224431">0xB244…4431</a></td>
+<td align="center"><b>Agent's key</b><br><a href="https://explorer.altana.network/account/0xB2441B175d620A3Fd5CDef28fA1c6957e6224431">Altana explorer</a></td>
+<td align="center"><b>Tests</b><br><a href="#tests">119 passing</a></td>
 </tr>
 </table>
 
@@ -190,8 +190,8 @@ Freelancer, any time: Receive → Payouts
 
 <table>
 <tr>
-<th width="50%">🔒 For the receiver (the freelancer)</th>
-<th width="50%">🔒 For the sender (the client)</th>
+<th width="50%">For the receiver (the freelancer)</th>
+<th width="50%">For the sender (the client)</th>
 </tr>
 <tr>
 <td valign="top">
