@@ -14,6 +14,7 @@ import { AltanaExecutor, type Call } from "./executor.ts";
 import { MAX_INVOICE_NGN, type Invoice, type InvoiceFile } from "./invoice.ts";
 import { payInvoice, reviewInvoice, type PayOutcome } from "./pay.ts";
 import { storedProofInfo } from "./proof.ts";
+import { checkDestination, parseAmount, withdraw, type WithdrawToken } from "./withdraw.ts";
 import { parseMetaAddress } from "./stealth.ts";
 import { receiptName, store } from "./store.ts";
 import type { TextileClient } from "./textile.ts";
@@ -35,6 +36,8 @@ export type Actions = {
   pay: (invoice: InvoiceFile, opts: { approvedUsdt: number; approveHolds: boolean; announce: boolean }) => Promise<PayOutcome>;
   /** A one-off action from the client's own wallet. `tag: false` for the announcer's deployment. */
   walletCalls: (calls: Call[], opts: { tag: boolean }) => Promise<{ status: string; hash?: Hex }>;
+  /** Send USD₮ or CELO out of the client's own wallet, signed with the client's key. */
+  withdraw: (w: { token: WithdrawToken; to: string; amount: string }) => Promise<{ token: WithdrawToken; amount: string; to: Address; hash: Hex }>;
 };
 
 export type AgentEnv = {
@@ -490,6 +493,21 @@ export function createAgent(env: AgentEnv) {
       await exclusive("taking the agent's key back", actions.revoke);
       return { ok: true };
     }
+    if (is("POST", "wallet", true) && id === "withdraw") {
+      // The client's own money, signed with the client's own key: never the agent's.
+      if (!env.hasAdminKey() || !env.rpcUrl) throw new AgentError(400, "Withdrawing needs your wallet key here.");
+      const token = body.token === "CELO" ? "CELO" : body.token === "USDT" ? "USDT" : null;
+      if (!token) throw new AgentError(400, "Choose USD₮ or CELO.");
+      const to = String(body.to ?? "");
+      const amount = String(body.amount ?? "");
+      try {
+        checkDestination(to, privateKeyToAccount(env.adminKey()).address);
+        if (amount.trim().toLowerCase() !== "max") parseAmount(amount, token);
+      } catch (e) {
+        throw new AgentError(400, (e as Error).message);
+      }
+      return exclusive("withdrawing from your wallet", () => actions.withdraw({ token, to, amount }));
+    }
     if (is("POST", "delivery", true) && id === "setup") {
       return exclusive("turning on automatic delivery", setupDelivery);
     }
@@ -521,6 +539,7 @@ function defaultActions(env: AgentEnv): Actions {
     grant: (limits) => grantAgentSession(env.adminKey(), { ...limits, announcer: env.announcer }),
     revoke: () => revokeAgentSession(env.adminKey()),
     proofRefresh: () => refreshTakerProof(env.adminKey()),
+    withdraw: (w) => withdraw({ adminKey: env.adminKey(), rpcUrl: env.rpcUrl!, code: code(), ...w }),
     walletCalls: (calls, opts) => walletExecute(env.adminKey(), calls, opts.tag ? code() : null, selfSubmit() ? { rpcUrl: env.rpcUrl!, code: code() } : undefined),
     pay: async (invoice, opts) => {
       // Textile's wallet proof lasts about 11 hours. With the client's key at hand, renew it rather than fail.

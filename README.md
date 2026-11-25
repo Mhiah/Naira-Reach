@@ -17,7 +17,7 @@ Built for **Agents Open for Business** (Loops House, on Celo), entering the **St
 <td align="center"><b>Agent identity</b><br><a href="https://8004scan.io/agents/celo/10090">ERC-8004 #10090</a></td>
 <td align="center"><b>Client wallet</b><br><a href="https://celoscan.io/address/0xB2441B175d620A3Fd5CDef28fA1c6957e6224431">0xB244…4431</a></td>
 <td align="center"><b>Agent's key</b><br><a href="https://explorer.altana.network/account/0xB2441B175d620A3Fd5CDef28fA1c6957e6224431">Altana explorer</a></td>
-<td align="center"><b>Tests</b><br><a href="#tests">157 passing</a></td>
+<td align="center"><b>Tests</b><br><a href="#tests">191 passing</a></td>
 </tr>
 </table>
 
@@ -92,7 +92,7 @@ Everything below is live on Celo mainnet (chain 42220) and can be checked on the
 | **Automatic delivery** | The standard ERC-5564 announcer, deployed on Celo by Naira Reach at the same address it has on other chains: [`0x5564…5564`](https://celoscan.io/address/0x55649E01B5Df198D18D95b5cc5051630cfD45564). The ₦2,000 was announced in [0x14b4…5fc9](https://celoscan.io/tx/0x14b4850f552900f143b26ecc45e35721f5eeed7e1ab91ab3a50ca2633bed5fc9), and the Receive page found it with nothing but the receiver's own keys |
 | **Tagged payment from the agent wallet** | ₦2,000 (test invoice TEST-003), still signed by the agent's limited key as one atomic Altana intent, but **sent by the wallet itself** with the Loops House code as the last bytes of the transaction: [0xd540…7754](https://celoscan.io/tx/0xd54014be53c8034b73d4484f32096cb2b7870a8299c075836c99459dde4f7754). Its announcement went the same way: [0xa390…f96a](https://celoscan.io/tx/0xa390411fe01da15bc0b388d9b8a70a22ebc817a71ed43ef259e6674fd2eff96a). Loops House's own check now shows **"Tag seen on-chain"** for this entry |
 | **Attribution** | Every call inside a payment carries the Loops House code (ERC-8021), and so does the outer transaction now that the wallet sends it. The first payment (TEST-002) went through Altana's relayer, so it isn't counted; every payment since is |
-| **Tests** | 157 passing, no network needed. See [Tests](#tests) |
+| **Tests** | 191 passing, no network needed. See [Tests](#tests) |
 | **Live checks** | Textile's live preview gave a flat ₦1,442.52 per USD₮ from ₦1,000 to ₦20,000,000, with a 0.02% fee, answering in 0.3 to 1.1 seconds. A ₦150,000 quote didn't move at all over 66 seconds of sampling |
 
 ---
@@ -260,6 +260,7 @@ Open [nairareach.myacxt.site](https://nairareach.myacxt.site). Choose **Send** o
 
     <img src="web/guide/send-11-pay.webp" alt="Pay an invoice: the invoice, the checks and the quote" width="640">
 12. **Paid and delivered.** The naira is at a fresh private address, and it's already on the freelancer's Receive page. **Download receipt** keeps a copy for your records.
+13. **Take money out, if you need to.** **Withdraw** under the wallet balance on the Overview sends USD₮ or leftover CELO to any Celo address: an exchange's deposit address or another wallet. **Max** leaves a few cents for the fee. It is signed with your own wallet key, never the agent's, and refuses the zero address and token contracts.
 
 ### Receive: the freelancer's side
 
@@ -341,7 +342,7 @@ npm install
 npm test
 ```
 
-**157 tests in 13 files, all passing, with no network needed.** They cover:
+**191 tests in 14 files, all passing, with no network needed.** They cover:
 
 | Area | What is checked |
 |---|---|
@@ -354,6 +355,7 @@ npm test
 | Attribution | Tags byte-identical to the official ERC-8021 encoder. The wallet sending its own Altana payment: the signed intent encoded exactly as Altana's relayer encodes it, sent from the wallet with the tag last, checked for free before sending |
 | Holds | Every check in [What it catches](#what-it-catches) |
 | Invoices | Redaction before the AI reader (emails, phones and account numbers however they're written, IBANs, wallet addresses), strict amounts (no booleans, hex or exponents), size limits |
+| Withdrawing | The client's own transfer signed against a simulated Celo node and decoded: right amount and address, USD₮ fee and tag, plain CELO. What Max leaves for the fee. Refuses the zero address, the wallet itself, token contracts and bad amounts, and needs the client's own key |
 | Keys | The password vault (wrong password, tampered file), the browser's key handling |
 | Website | The local server's protections, the Textile relay's allowlist and limits |
 | Full flow | Pay from start to finish with a mocked Textile and wallet, including failures |
@@ -466,6 +468,7 @@ Sources: the Textile FX address book, Celo's fee currency list, the Altana SDK, 
 | `src/stealth.ts` | Private payout addresses (ERC-5564 scheme 1) |
 | `src/announcer.ts` | ERC-5564 announcements and the standard announcer |
 | `src/move.ts` | Moving a payout, shared by the command line and the website |
+| `src/withdraw.ts` | The client taking USD₮ or CELO out of their own wallet |
 | `src/claim.ts` | The freelancer's claim from the command line |
 | `src/tag.ts` | ERC-8021 attribution tags |
 | `src/vault.ts` | The password vault (PBKDF2 + AES-256-GCM) |

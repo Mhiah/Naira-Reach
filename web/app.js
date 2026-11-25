@@ -409,6 +409,7 @@
         <span class="label">Wallet balance</span>
         <span class="figure">${live ? usdt(live.usdt) : "–"}<span class="unit">USD₮</span></span>
         <span class="note">${w.address ? `<span class="mono">${esc(short(w.address))}</span>${badge(w.activated ? "Altana wallet" : "Not activated", "neutral")}` : "No wallet yet"}</span>
+        ${w.address ? `<button class="btn btn-secondary btn-sm" type="button" id="w-open" aria-expanded="${showWithdraw}" style="align-self:flex-start">${icon("send")}Withdraw</button>` : ""}
       </article>
       <article class="card stat">
         <span class="label">Paid out this week</span>
@@ -423,6 +424,10 @@
           : `<span class="figure">–</span><span class="note">The agent has no key. <a href="#/pay/access">Give it one</a></span>`}
       </article>
     </section>
+    ${showWithdraw ? `<section class="card stack" aria-label="Withdraw">
+      <div class="card-head" style="margin-bottom:0"><h2>Withdraw from your wallet</h2><button class="btn btn-secondary btn-sm" type="button" id="w-close">Close</button></div>
+      ${withdrawForm()}
+    </section>` : ""}
     <section class="grid-2" aria-label="Activity">
       <article class="card chart">
         <div class="card-head"><h2>Naira delivered</h2>${everPaid ? `<div class="legend"><span><i></i>Naira paid</span>${ses && ses.cngnPerWeek ? '<span><i class="dash"></i>Weekly limit</span>' : ""}</div>` : ""}</div>
@@ -869,6 +874,24 @@
   const live = {}; // stealth address -> { cngn, usdt } | { error }
   let picked = null;
   let showCashout = false;
+  let showWithdraw = false;
+
+  // Taking USD₮ or CELO out of the client's own wallet. Signed with the client's key, never the agent's.
+  function withdrawForm() {
+    const f = "field";
+    const w = S.wallet;
+    const live = w.live && w.live.ok ? w.live : null;
+    return `<form class="form-grid" id="w-form" novalidate>
+      <div class="${f}"><label for="w-token">Take out</label><select class="input" id="w-token" name="token">
+        <option value="USDT">USD₮${live ? ` (you have ${usdt(live.usdt)})` : ""}</option>
+        <option value="CELO">CELO${live && live.celo != null ? ` (you have ${live.celo.toFixed(2)})` : ""}</option>
+      </select></div>
+      <div class="${f}"><label for="w-amt">Amount</label><div class="input-row"><input class="input mono" id="w-amt" name="amount" inputmode="decimal" placeholder="5.00" autocomplete="off"><button class="btn btn-secondary btn-sm" type="button" id="w-max">Max</button></div></div>
+      <div class="field wide"><label for="w-to">Send to</label><input class="input mono" id="w-to" name="to" placeholder="0x… an exchange deposit address on Celo, or your own wallet" autocomplete="off" spellcheck="false"></div>
+      <p class="wide small muted">Signed with your own wallet key, not the agent's. Only send to an address on the <strong>Celo</strong> network: transfers can't be undone.</p>
+      <div class="wide"><button class="btn btn-primary" id="w-go" type="submit" ${w.hasKey && w.address ? "" : "disabled"}>${icon("send")}Withdraw</button></div>
+    </form>`;
+  }
   let scanning = null; // { done, total } while checking Celo for announcements
   let scanError = null;
 
@@ -1271,6 +1294,15 @@
         }
         return;
       }
+      case "w-open":
+      case "w-close":
+        showWithdraw = t.id === "w-open" ? !showWithdraw : false;
+        return render();
+      case "w-max": {
+        const input = document.getElementById("w-amt");
+        if (input) input.value = "Max";
+        return;
+      }
       case "cashout-toggle":
       case "cashout-close":
         showCashout = t.id === "cashout-toggle" ? !showCashout : false;
@@ -1357,6 +1389,23 @@
         form.reset();
         toast("Locked file downloaded. Open it on the online site with the same password.");
       }).catch(() => {});
+    }
+    if (form.id === "w-form") {
+      const token = String(data.token);
+      const amount = /^max$/i.test(String(data.amount).trim()) ? "max" : String(data.amount || "").trim();
+      const to = String(data.to || "").trim();
+      if (!amount) return toast("Enter an amount, or press Max.");
+      if (!/^0x[0-9a-fA-F]{40}$/.test(to)) return toast("Paste a Celo address: 0x and 40 more characters.");
+      const what = `${amount === "max" ? "all your" : amount} ${token === "USDT" ? "USD₮" : "CELO"}`;
+      if (!window.confirm(`Send ${what} to ${to.slice(0, 6)}…${to.slice(-4)}?\n\nOnly do this if that address is on the Celo network. It can't be undone.`)) return;
+      await busy(form.querySelector("#w-go"), "Sending…", async () => {
+        const r = await api("POST", "/wallet/withdraw", { token, amount, to });
+        toast(`Sent ${Number(r.amount).toLocaleString("en-US", { maximumFractionDigits: 6 })} ${r.token === "USDT" ? "USD₮" : "CELO"}`);
+        showWithdraw = false;
+        await loadState();
+        render();
+      }).catch(() => {});
+      return;
     }
     if (form.id === "g-form") {
       await busy(form.querySelector("#g-save"), "Granting… about a minute", async () => {
