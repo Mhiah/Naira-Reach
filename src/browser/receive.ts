@@ -131,11 +131,11 @@ export async function scan(a: { rpcUrl: string; keys: MetaKeys; from?: string | 
 /** What a payout address holds now, in whole naira and USD₮. */
 export async function balances(rpcUrl: string, address: Address) {
   const b = await payoutBalances(client(rpcUrl), address);
-  return { cngn: Number(formatUnits(b.cngn, DECIMALS.CNGN)), usdt: Number(formatUnits(b.usdt, DECIMALS.USDT)) };
+  return { cngn: Number(formatUnits(b.cngn, DECIMALS.CNGN)), cngnUnits: b.cngn.toString(), usdt: Number(formatUnits(b.usdt, DECIMALS.USDT)) };
 }
 
-/** Send everything in the payout address to `to`. */
-export async function move(a: { rpcUrl: string; keys: MetaKeys; payout: OpenedPayout; to: string; code?: string | null }) {
+/** Send the payout address's cNGN to `to`: all of it, or `amount` (base units, as a string). */
+export async function move(a: { rpcUrl: string; keys: MetaKeys; payout: OpenedPayout; to: string; code?: string | null; amount?: string | null }) {
   if (!isAddress(a.to.trim())) throw new Error("That is not a wallet address. It starts with 0x and has 42 characters.");
   const r = await movePayout({
     payout: { stealthAddress: a.payout.stealthAddress, ephemeralPublicKey: a.payout.ephemeralPublicKey, viewTag: a.payout.viewTag },
@@ -144,6 +144,7 @@ export async function move(a: { rpcUrl: string; keys: MetaKeys; payout: OpenedPa
     reader: client(a.rpcUrl),
     rpcUrl: a.rpcUrl,
     code: a.code,
+    ...(a.amount ? { amount: BigInt(a.amount) } : {}),
   });
   return { hash: r.hash, explorer: EXPLORER_TX(r.hash), amountNgn: Number(formatUnits(r.cngn, DECIMALS.CNGN)), to: r.to };
 }

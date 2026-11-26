@@ -931,6 +931,35 @@
     redraw();
   }
 
+  // Naira at a payout address, in cNGN base units (6 decimals), so amounts add up exactly.
+  const unitsOf = (p) => {
+    const l = live[p.stealthAddress];
+    return l && !l.error && l.cngnUnits ? BigInt(l.cngnUnits) : 0n;
+  };
+  const fmtNaira = (units) => {
+    const whole = units / 1000000n;
+    const frac = (units % 1000000n).toString().padStart(6, "0").replace(/0+$/, "");
+    return whole.toLocaleString("en-US") + (frac ? "." + frac : "");
+  };
+  function nairaUnits(text) {
+    const t = String(text).replace(/[,\s₦]/g, "");
+    if (!/^\d+(\.\d{1,6})?$/.test(t)) return null;
+    const [w, f = ""] = t.split(".");
+    return BigInt(w) * 1000000n + BigInt(f.padEnd(6, "0"));
+  }
+  // Which payouts to move, and how much from each: biggest first, so it takes as few transactions as it can.
+  function planMove(ready, want) {
+    const steps = [];
+    let left = want;
+    for (const p of [...ready].sort((a, b) => (unitsOf(b) > unitsOf(a) ? 1 : unitsOf(b) < unitsOf(a) ? -1 : 0))) {
+      if (left <= 0n) break;
+      const has = unitsOf(p);
+      steps.push({ p, units: has <= left ? has : left, all: has <= left });
+      left -= has <= left ? has : left;
+    }
+    return steps;
+  }
+
   function payouts() {
     const keys = store.get("keys", null);
     const list = store.get("payouts", []);
@@ -940,7 +969,7 @@
           <div class="card-head" style="margin-bottom:0"><h2>Cash out to your bank</h2><button class="btn btn-secondary btn-sm" type="button" id="cashout-close">Close</button></div>
           <ol class="checks">
             <li><span class="ico todo">1</span><div><div class="strong">Find an exchange that takes cNGN on Celo</div><div class="small muted">Nigerian exchanges such as Busha and Quidax list cNGN. In the exchange's app, check that its cNGN deposit network includes <strong>Celo</strong>.</div></div><span></span></li>
-            <li><span class="ico todo">2</span><div><div class="strong">Move your naira there</div><div class="small muted">Copy the exchange's cNGN deposit address on Celo, paste it in <strong>Send to</strong> below, and click Move naira.</div></div><span></span></li>
+            <li><span class="ico todo">2</span><div><div class="strong">Move your naira there</div><div class="small muted">Copy the exchange's cNGN deposit address on Celo, paste it in <strong>Send to</strong> below, press <strong>Max</strong> or type an amount, and click Move naira.</div></div><span></span></li>
             <li><span class="ico todo">3</span><div><div class="strong">Sell and withdraw</div><div class="small muted">On the exchange, sell the cNGN for naira (cNGN is backed 1:1 by naira), then withdraw to your bank account.</div></div><span></span></li>
           </ol>
           ${callout("Only send to a cNGN deposit address on the <strong>Celo</strong> network. If the exchange only lists other networks, don't send there: money sent on a network it doesn't support may not arrive.", "", "flag")}
@@ -966,9 +995,7 @@
     };
     const ready = list.filter((p) => state(p) === "ready");
     const readyNgn = ready.reduce((a, p) => a + live[p.stealthAddress].cngn, 0);
-    if (!picked || !list.some((p) => p.stealthAddress === picked)) picked = (ready[0] || list[0] || {}).stealthAddress || null;
-    const sel = list.find((p) => p.stealthAddress === picked);
-    const selLive = sel && live[sel.stealthAddress];
+    const readyUnits = ready.reduce((a, p) => a + unitsOf(p), 0n);
     const gas = (list.find((p) => p.gasMoneyUsdt) || {}).gasMoneyUsdt || 0.05;
     const prog = store.get("scan", {});
     const scanNote = scanning
@@ -991,8 +1018,8 @@
         <div class="card-head"><h2>Your payouts</h2><div class="row">${scanNote}<button class="btn btn-secondary btn-sm" type="button" id="scan-now" ${scanning ? "disabled" : ""}>${icon("refresh")}Check again</button></div></div>
         ${list.length ? `<div class="table-wrap"><table class="payouts-table">
           <thead><tr><th>Invoice</th><th class="hide-sm">Date</th><th class="hide-sm">Address</th><th>Amount</th></tr></thead>
-          <tbody>${list.map((p) => `<tr class="pick ${p.stealthAddress === picked ? "picked" : ""}" data-pick="${esc(p.stealthAddress)}" tabindex="0" aria-selected="${p.stealthAddress === picked}">
-            <td><span class="strong mono">${esc(p.invoiceId)}</span><span class="sub">${label[state(p)]}</span></td>
+          <tbody>${list.map((p) => `<tr>
+            <td><span class="strong mono">${esc(p.invoiceId)}</span><span class="sub">${label[state(p)]}${p.movedTx ? ` · <a href="${esc(R.explorerTx(p.movedTx))}" target="_blank" rel="noopener">last move</a>` : ""}</span></td>
             <td class="hide-sm"><time>${p.paidAt ? fmtDate(p.paidAt) : "–"}</time></td>
             <td class="hide-sm mono small">${esc(short(p.stealthAddress))}</td>
             <td class="mono">${ngn(shownNgn(p))}</td>
@@ -1001,16 +1028,15 @@
         <p class="small muted" style="margin-top:12px">Got a receipt file from a client? <button class="btn-link" type="button" id="open-receipt">Open it</button></p>
       </article>
       <article class="card stack">
-        ${sel ? `<div class="card-head" style="margin-bottom:0"><h2>Move ${ngn(selLive && !selLive.error ? selLive.cngn : sel.amountNgn)}</h2>${badge(sel.invoiceId)}</div>
-          ${state(sel) === "ready" ? `
+        <div class="card-head" style="margin-bottom:0"><h2>Move naira</h2>${ready.length ? badge(`${ngn(readyNgn)} ready`) : ""}</div>
+        ${ready.length ? `
+          <div class="field"><label for="mv-amt">Amount in naira</label><div class="input-row"><input class="input mono" id="mv-amt" inputmode="decimal" autocomplete="off" placeholder="${esc(fmtNaira(readyUnits))}"><button class="btn btn-secondary btn-sm" type="button" id="mv-max">Max</button></div></div>
           <div class="field"><label for="to">Send to</label><input class="input mono" id="to" autocomplete="off" spellcheck="false" placeholder="0x… wallet address"></div>
           <button class="btn btn-primary" type="button" id="move">${icon("send")}Move naira</button>
-          <p class="small muted">Your wallet, or an exchange that takes cNGN on Celo. Gas comes from the ${usdt(selLive && !selLive.error && selLive.usdt ? selLive.usdt : sel.gasMoneyUsdt)} USD₮ sent with this payout.</p>`
-          : state(sel) === "moved" ? `<p>Moved. <a href="${esc(R.explorerTx(sel.movedTx))}" target="_blank" rel="noopener">See the transaction</a></p>`
-          : state(sel) === "checking" ? loading("Checking the payout address…")
-          : state(sel) === "unknown" ? `<p class="muted">Couldn't reach Celo to check this payout: ${esc(selLive.error)}</p><div><button class="btn btn-secondary btn-sm" type="button" id="recheck-live">Try again</button></div>`
-          : `<p class="muted">This payout address holds no naira.</p>`}`
-        : `<div class="card-head" style="margin-bottom:0"><h2>Move naira</h2></div><p class="muted">Open a receipt to move a payout.</p>`}
+          <p class="small muted">Your wallet, or an exchange that takes cNGN on Celo. Each payout sits at its own address, so moving from more than one takes one transaction each. The fee comes from the USD₮ sent with each payout.</p>`
+        : list.some((p) => state(p) === "checking") ? loading("Checking your payout addresses…")
+        : list.some((p) => state(p) === "unknown") ? `<p class="muted">Couldn't reach Celo to check your payouts.</p><div><button class="btn btn-secondary btn-sm" type="button" id="recheck-live">Try again</button></div>`
+        : `<p class="muted">${list.length ? "Nothing left to move." : "Payouts you can move show up here."}</p>`}
       </article>
     </section>`;
   }
@@ -1309,24 +1335,52 @@
         return render();
       case "scan-now":
         return scanPayouts(true);
+      case "mv-max": {
+        const list = store.get("payouts", []);
+        const total = list.reduce((a, p) => a + unitsOf(p), 0n);
+        const input = view.querySelector("#mv-amt");
+        if (input) input.value = fmtNaira(total);
+        return;
+      }
       case "recheck-live":
-        delete live[picked];
+        for (const p of store.get("payouts", [])) if (live[p.stealthAddress] && live[p.stealthAddress].error) delete live[p.stealthAddress];
         render();
-        return refreshLive(store.get("payouts", []).filter((p) => p.stealthAddress === picked));
+        render();
+        return refreshLive(store.get("payouts", []).filter((p) => !live[p.stealthAddress]));
       case "move": {
         const to = view.querySelector("#to").value.trim();
+        const want = nairaUnits(view.querySelector("#mv-amt").value);
         const list = store.get("payouts", []);
-        const p = list.find((x) => x.stealthAddress === picked);
-        if (!p) return;
-        return busy(t, "Moving… about 10 seconds", async () => {
-          const r = await R.move({ rpcUrl: RPC, keys: store.get("keys", null), payout: p, to, code: CFG.attributionCode });
-          p.movedTx = r.hash;
-          p.movedTo = r.to;
-          store.set("payouts", list);
-          toast(`Moved ${ngn(r.amountNgn)} to ${short(r.to)}`);
-          delete live[p.stealthAddress];
-          render();
-          refreshLive([p]);
+        const ready = list.filter((p) => unitsOf(p) > 0n);
+        const total = ready.reduce((a, p) => a + unitsOf(p), 0n);
+        if (want === null || want <= 0n) return toast("Enter how much naira to move, or press Max.");
+        if (want > total) return toast(`You have ₦${fmtNaira(total)} ready to move.`);
+        if (!/^0x[0-9a-fA-F]{40}$/.test(to)) return toast("Paste a wallet address: 0x and 40 more characters.");
+        const steps = planMove(ready, want);
+        const n = steps.length;
+        if (!window.confirm(`Move ₦${fmtNaira(want)} to ${to.slice(0, 6)}…${to.slice(-4)}?${n > 1 ? `\n\nThis takes ${n} transactions, one for each payout address.` : ""}\n\nCheck the address: transfers can't be undone.`)) return;
+        let moved = 0n;
+        let done = 0;
+        return busy(t, n > 1 ? `Moving 1 of ${n}…` : "Moving… about 10 seconds", async () => {
+          try {
+            for (const s of steps) {
+              if (t.isConnected && n > 1) t.innerHTML = `<span class="spinner"></span>Moving ${done + 1} of ${n}…`;
+              const r = await R.move({ rpcUrl: RPC, keys: store.get("keys", null), payout: s.p, to, code: CFG.attributionCode, amount: s.all ? null : s.units.toString() });
+              s.p.movedTx = r.hash;
+              s.p.movedTo = r.to;
+              store.set("payouts", list);
+              moved += s.units;
+              done++;
+            }
+            toast(`Moved ₦${fmtNaira(moved)} to ${short(to)}${n > 1 ? ` in ${n} transactions` : ""}`);
+          } catch (e) {
+            if (done) throw new Error(`Moved ₦${fmtNaira(moved)}, then stopped: ${e.shortMessage || e.message}`);
+            throw e;
+          } finally {
+            for (const s of steps) delete live[s.p.stealthAddress];
+            render();
+            refreshLive(steps.map((s) => s.p));
+          }
         }).catch(() => {});
       }
     }

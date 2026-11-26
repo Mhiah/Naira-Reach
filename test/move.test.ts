@@ -102,4 +102,19 @@ describe("moving a payout", () => {
     receiptStatus = "0x0";
     await expect(movePayout({ payout: newStealthAddress(keys.metaAddress), keys, to: MY_WALLET, reader: reader(), rpcUrl: url })).rejects.toThrow(/failed on-chain/);
   });
+
+  it("moves just part of a payout when an amount is given, and leaves the rest at the address", async () => {
+    const payout = newStealthAddress(keys.metaAddress);
+    const out = await movePayout({ payout, keys, to: MY_WALLET, reader: reader(), rpcUrl: url, amount: 750_500000n });
+    expect(out.cngn).toBe(750_500000n);
+    const tx = parseTransaction(raw[0]!) as any;
+    expect(decodeFunctionData({ abi: erc20Abi, data: tx.data })).toMatchObject({ functionName: "transfer", args: [MY_WALLET, 750_500000n] });
+  });
+
+  it("refuses an amount above what the payout holds, or zero, before signing anything", async () => {
+    const payout = newStealthAddress(keys.metaAddress);
+    await expect(movePayout({ payout, keys, to: MY_WALLET, reader: reader(), rpcUrl: url, amount: 2000_000001n })).rejects.toThrow(/more naira than/);
+    await expect(movePayout({ payout, keys, to: MY_WALLET, reader: reader(), rpcUrl: url, amount: 0n })).rejects.toThrow(/more than zero/);
+    expect(raw).toHaveLength(0);
+  });
 });

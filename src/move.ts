@@ -33,6 +33,8 @@ export async function movePayout(args: {
   rpcUrl: string;
   /** Attribution code to tag the transaction with, if known. */
   code?: string | null;
+  /** cNGN to move, in base units. Leave out to move everything in the payout address. */
+  amount?: bigint;
 }): Promise<{ from: Address; to: Address; cngn: bigint; hash: Hex }> {
   const account = payoutAccount(args.payout, args.keys);
   const to = getAddress(args.to);
@@ -45,8 +47,11 @@ export async function movePayout(args: {
   }
   const { cngn } = await payoutBalances(args.reader, account.address);
   if (cngn === 0n) throw new Error("Nothing to move: this payout address holds no cNGN.");
+  if (args.amount !== undefined && args.amount <= 0n) throw new Error("The amount to move must be more than zero.");
+  if (args.amount !== undefined && args.amount > cngn) throw new Error("That is more naira than this payout address holds.");
+  const value = args.amount ?? cngn;
 
-  const data = encodeFunctionData({ abi: erc20Abi, functionName: "transfer", args: [to, cngn] });
+  const data = encodeFunctionData({ abi: erc20Abi, functionName: "transfer", args: [to, value] });
   const wallet = createClient({ account, chain: celo, transport: http(args.rpcUrl) });
   const hash = await sendTransaction(wallet, {
     account,
@@ -57,5 +62,5 @@ export async function movePayout(args: {
   });
   const receipt = await waitForTransactionReceipt(args.reader, { hash, timeout: 180_000 });
   if (receipt.status !== "success") throw new Error(`The transfer failed on-chain: ${hash}`);
-  return { from: account.address, to, cngn, hash };
+  return { from: account.address, to, cngn: value, hash };
 }

@@ -104,7 +104,7 @@ Open [nairareach.myacxt.site](https://nairareach.myacxt.site). The switch at the
 git clone https://github.com/Mhiah/Naira-Reach.git
 cd Naira-Reach
 npm install
-npm test            # 191 tests in 14 files, no network needed
+npm test            # 193 tests in 14 files, no network needed
 npm run typecheck   # clean
 ```
 
@@ -135,7 +135,7 @@ npm run reach -- pay examples/invoice.json --dry-run
 
 - A working product on Celo mainnet, not a mock: one live website, a real Altana wallet, a real session key, a real Textile swap, and a real private payout that the freelancer's page found by itself.
 - Built so a mistake can't lose money: one atomic intent per invoice, a slippage guard the client sets, quotes checked before use, and no way to pay an address written on an invoice.
-- 191 tests, a clean typecheck, and no known vulnerabilities in dependencies.
+- 193 tests, a clean typecheck, and no known vulnerabilities in dependencies.
 
 ### Value proposition
 

@@ -221,12 +221,12 @@ window.NR_GUIDES = {
       {
         title: "Move your naira",
         img: "receive-5-move.webp",
-        alt: "The Move card with the Send to box and the Move naira button outlined",
+        alt: "The Move card with the amount, Max, the Send to box and the Move naira button outlined",
         intro: "Your naira arrives as cNGN, Nigeria's naira stablecoin, on Celo.",
         steps: [
-          "Click the payout in your list.",
+          "Type how much naira to move, or press <strong>Max</strong> for all of it.",
           "In <strong>Send to</strong>, paste your own wallet address, or an exchange's deposit address for cNGN on Celo.",
-          "Press <strong>Move naira</strong>. It takes about 10 seconds.",
+          "Press <strong>Move naira</strong>. It takes about 10 seconds for each payout it moves from.",
         ],
         tip: "The network fee comes from the 0.05 USD₮ your client sent with the payout, so moving it costs you nothing. Check the address twice: transfers can't be undone.",
       },
