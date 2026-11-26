@@ -3,8 +3,8 @@
 //  - in the client's own browser, on the online site (src/browser/send.ts)
 // It holds no keys itself: `env.adminKey()` hands over the client's key only for
 // the moment an action needs it. Records go through the active store.
-import { agentPageUrl } from "@altananetwork/sdk";
-import { erc20Abi, formatUnits, getAddress, parseUnits, sha256, type Address, type Hex, type PublicClient } from "viem";
+import { agentPageUrl, getKey, keyHashForSessionOrKey } from "@altananetwork/sdk";
+import { BaseError, ContractFunctionRevertedError, erc20Abi, formatUnits, getAddress, parseUnits, sha256, type Address, type Hex, type PublicClient } from "viem";
 import { privateKeyToAccount } from "viem/accounts";
 import { activateClientWallet, grantAgentSession, loadAgentSession, loadClientRecord, refreshTakerProof, revokeAgentSession, sessionMayAnnounce, storedSession, walletExecute } from "./altana.ts";
 import { announceCall, announcerLive, deployCall, ERC5564_ANNOUNCER } from "./announcer.ts";
@@ -131,16 +131,44 @@ export function createAgent(env: AgentEnv) {
     return { usdt, cngn, since: from };
   }
 
-  function sessionView(ledger: PaidEntry[]) {
+  // Is the agent's key still on the wallet? Checked on Celo, at most once a minute.
+  // false only when the wallet answers that it has no such key (replaced or revoked); null when unsure.
+  let keyCheck: { hash: Hex; at: number; onChain: boolean | null } | null = null;
+  async function keyOnChain(): Promise<boolean | null> {
+    const s = storedSession();
+    if (!s) return null;
+    let hash: Hex;
+    try {
+      hash = keyHashForSessionOrKey(s.publicKey);
+    } catch {
+      return null;
+    }
+    if (keyCheck && keyCheck.hash === hash && now() - keyCheck.at < 60_000) return keyCheck.onChain;
+    let onChain: boolean | null;
+    try {
+      await withTimeout(getKey(env.reader, s.walletAddress, hash), 8000);
+      onChain = true;
+    } catch (e) {
+      onChain = e instanceof BaseError && e.walk((x) => x instanceof ContractFunctionRevertedError) ? false : null;
+    }
+    keyCheck = { hash, at: now(), onChain };
+    return onChain;
+  }
+
+  function sessionView(ledger: PaidEntry[], onChain: boolean | null = null) {
     const s = storedSession();
     if (!s) return null;
     const spend = (token: Address) => s.permissions.spend?.find((x) => x.token && getAddress(x.token) === getAddress(token));
     const usdtLimit = spend(TOKENS.USDT);
     const cngnLimit = spend(TOKENS.CNGN);
     const used = usedThisWeek(ledger);
+    const ranOut = s.expiry * 1000 <= now();
+    const gone = !ranOut && onChain === false;
     return {
       expiresAt: s.expiry * 1000,
-      expired: s.expiry * 1000 <= now(),
+      // A key no longer on the wallet can't pay, whatever its expiry says.
+      expired: ranOut || gone,
+      gone,
       usdtPerWeek: usdtLimit ? Number(formatUnits(BigInt(usdtLimit.limit), DECIMALS.USDT)) : null,
       cngnPerWeek: cngnLimit ? Number(formatUnits(BigInt(cngnLimit.limit), DECIMALS.CNGN)) : null,
       used,
@@ -259,10 +287,11 @@ export function createAgent(env: AgentEnv) {
     const freelancers = loadFreelancers();
     const wallet = walletAddress();
     const client = loadClientRecord();
-    const [live, liveRate, announcer] = await Promise.all([
+    const [live, liveRate, announcer, onChain] = await Promise.all([
       wallet ? balances(wallet).then((v) => ({ ok: true as const, ...v }), (e: Error) => ({ ok: false as const, error: e.message })) : null,
       rate().then((v) => ({ ok: true as const, ...v }), (e: Error) => ({ ok: false as const, error: e.message })),
       announcerIsLive(),
+      keyOnChain(),
     ]);
     const proof = storedProofInfo();
     const paid = ledger.map((e) => {
@@ -310,7 +339,7 @@ export function createAgent(env: AgentEnv) {
         agentPage: client.agentId ? (agentPageUrl(CELO_CHAIN_ID, client.agentId) ?? null) : null,
         live,
       },
-      session: sessionView(ledger),
+      session: sessionView(ledger, onChain),
       delivery: { live: announcer, address: ERC5564_ANNOUNCER, pending: unannounced().length, agentAnnounces: sessionMayAnnounce() },
       proof: proof && wallet && getAddress(proof.taker) === getAddress(wallet) ? { validUntil: proof.validUntil, fresh: proof.validUntil > now() } : null,
       rate: liveRate,
@@ -380,6 +409,7 @@ export function createAgent(env: AgentEnv) {
   }
 
   async function pay(id: string, body: Record<string, unknown>) {
+    if ((await keyOnChain()) === false) throw new AgentError(400, KEY_GONE);
     const file = inboxFile(id);
     const approvedUsdt = Number(body.approvedUsdt);
     if (!Number.isFinite(approvedUsdt) || approvedUsdt <= 0) throw new AgentError(400, "Approve a price first.");
@@ -387,7 +417,10 @@ export function createAgent(env: AgentEnv) {
     const agentAnnounces = sessionMayAnnounce() && delivery;
     let deliveryError: string | null = null;
     const outcome = await exclusive("paying an invoice", async () => {
-      const out = await actions.pay(file, { approvedUsdt, approveHolds: body.approveHolds === true, announce: agentAnnounces });
+      const out = await actions.pay(file, { approvedUsdt, approveHolds: body.approveHolds === true, announce: agentAnnounces }).catch((e: unknown) => {
+        if (e instanceof Error) e.message = friendlyPayError(e.message);
+        throw e;
+      });
       // The agent's key couldn't announce it: the client's wallet does, so the freelancer still finds it.
       if (out.status === "paid" && !agentAnnounces && env.hasAdminKey() && delivery) {
         await announcePending().catch((e: Error) => {
@@ -580,6 +613,20 @@ function describeCall(c: { to?: Address; signature?: string }) {
   if (to === TEXTILE_REACTOR) return { what: "Swap on Textile FX", detail: `LimitOrderReactor · ${to.slice(0, 6)}…${to.slice(-4)}` };
   if (sig.startsWith("announce")) return { what: "Announce the private payout", detail: `Announcer · ${sig}` };
   return { what: "Other call", detail: `${to ?? "any contract"} · ${sig}` };
+}
+
+/** What the agent's key being gone means, in words the client can act on. */
+export const KEY_GONE =
+  "The agent's key is no longer on your wallet: it was replaced or revoked, so nothing was sent. Pay from the browser where you gave the agent its current key, or give it a new key on Agent access.";
+
+/** Turn the raw failures a client can actually hit while paying into plain sentences. */
+export function friendlyPayError(message: string): string {
+  if (/key hash 0x[0-9a-f]+ is unknown/i.test(message)) return KEY_GONE;
+  if (/No firm quote \(no_quote/i.test(message)) {
+    return "Textile's market makers didn't lock in a price just now, so nothing was sent. Wait a minute, then press Approve and pay again.";
+  }
+  if (/No firm quote \(/i.test(message)) return `Textile didn't give a firm price, so nothing was sent. Try again in a minute. (${message.replace(/^No firm quote /, "").replace(/\.$/, "")})`;
+  return message;
 }
 
 export function numberOf(v: unknown): number {

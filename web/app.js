@@ -795,7 +795,8 @@
       })}
       <section class="grid-2" aria-label="Give the agent a key">
         <article class="card">
-          <div class="card-head"><h2>Give the agent a key</h2>${expired ? badge("Last key expired", "neutral") : ""}</div>
+          <div class="card-head"><h2>Give the agent a key</h2>${S.session && S.session.gone ? badge("Last key replaced or revoked", "neutral") : expired ? badge("Last key expired", "neutral") : ""}</div>
+          ${S.session && S.session.gone ? callout("The agent's key saved here is no longer on your wallet: it was replaced or revoked, maybe from another browser. Pay from the browser that holds the current key, or give the agent a new key here.", "", "flag") : ""}
           <form class="form-grid" id="g-form" novalidate>
             <div class="field"><label for="g-usdt">USD₮ per week</label><input class="input mono" id="g-usdt" name="usdtPerWeek" inputmode="decimal" value="200"></div>
             <div class="field"><label for="g-cngn">Naira per week (₦)</label><input class="input mono" id="g-cngn" name="cngnPerWeek" inputmode="numeric" value="300,000"></div>
@@ -1150,7 +1151,7 @@
       return;
     }
     if (!S) sideCard.innerHTML = `<span class="label">Agent</span><span class="strong">${(CFG.agent || HOSTED) && !stateError ? "Connecting…" : "Not running"}</span>`;
-    else if (!ses) sideCard.innerHTML = `<span class="label">Agent key</span><span class="strong">${S.session && S.session.expired ? "Expired" : "Not given yet"}</span><a class="small" href="#/pay/access">Agent access</a>`;
+    else if (!ses) sideCard.innerHTML = `<span class="label">Agent key</span><span class="strong">${S.session && S.session.gone ? "Replaced or revoked" : S.session && S.session.expired ? "Expired" : "Not given yet"}</span><a class="small" href="#/pay/access">Agent access</a>`;
     else {
       const days = Math.max(0, Math.ceil((ses.expiresAt - Date.now()) / 86400000));
       sideCard.innerHTML = `<span class="label">Agent key</span><span class="spread"><span class="strong">Active</span>${badge(plural(days, "day", "days"))}</span><div class="bar"><span style="width:${pct(ses.used.usdt, ses.usdtPerWeek)}%"></span></div><span class="small muted mono">${usdt(Math.max(0, ses.usdtPerWeek - ses.used.usdt))} of ${limit(ses.usdtPerWeek)} USD₮ left</span>`;

@@ -228,8 +228,8 @@ td .sub { display: block; font-size: var(--fs-small); color: var(--color-muted);
 .input-row .btn { align-self: stretch; }
 .drop.drop-compact { padding: var(--s4); align-items: flex-start; text-align: left; gap: var(--s3); }
 .drop.drop-compact .btn svg { width: 16px; height: 16px; color: currentColor; }
-.callout { display: flex; gap: var(--s3); align-items: flex-start; padding: var(--s3) var(--s4); border-radius: var(--radius-button); background: var(--tint-accent); font-size: 15px; }
-.callout svg { width: 18px; height: 18px; flex: none; margin-top: 3px; color: var(--color-accent); }
+.callout { display: flex; gap: var(--s3); align-items: flex-start; padding: var(--s3) var(--s4); border-radius: var(--radius-button); background: var(--tint-accent); font-size: 13px; line-height: 1.5; }
+.callout svg { width: 16px; height: 16px; flex: none; margin-top: 2px; color: var(--color-accent); }
 .stack { display: flex; flex-direction: column; gap: var(--s4); }
 .row { display: flex; gap: var(--s3); align-items: center; flex-wrap: wrap; }
 .spread { display: flex; justify-content: space-between; align-items: center; gap: var(--s3); }
@@ -287,6 +287,7 @@ details > summary:hover { color: var(--color-text); }
 .notes .callout { font-size: 13px; }
 .notes .callout svg { width: 16px; height: 16px; margin-top: 2px; }
 .callout code, .checks code { font-family: var(--font-mono); font-size: 14px; background: var(--color-bg); border: 1px solid var(--color-border); border-radius: 6px; padding: 1px 6px; word-break: break-all; }
+.callout code { font-size: 12px; }
 .drop.over { border-color: var(--color-accent); background: var(--tint-accent); }
 .checks .ico.todo { background: transparent; border: 1.5px solid var(--color-border); color: var(--color-muted); font-family: var(--font-mono); font-size: 12px; }
 .checks .step-action { margin-top: var(--s2); }
