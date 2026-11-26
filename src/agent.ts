@@ -383,12 +383,16 @@ export function createAgent(env: AgentEnv) {
     const file = inboxFile(id);
     const approvedUsdt = Number(body.approvedUsdt);
     if (!Number.isFinite(approvedUsdt) || approvedUsdt <= 0) throw new AgentError(400, "Approve a price first.");
-    const agentAnnounces = sessionMayAnnounce() && (await announcerIsLive());
+    const delivery = await announcerIsLive();
+    const agentAnnounces = sessionMayAnnounce() && delivery;
+    let deliveryError: string | null = null;
     const outcome = await exclusive("paying an invoice", async () => {
       const out = await actions.pay(file, { approvedUsdt, approveHolds: body.approveHolds === true, announce: agentAnnounces });
       // The agent's key couldn't announce it: the client's wallet does, so the freelancer still finds it.
-      if (out.status === "paid" && !agentAnnounces && env.hasAdminKey() && (await announcerIsLive())) {
-        await announcePending().catch(() => undefined);
+      if (out.status === "paid" && !agentAnnounces && env.hasAdminKey() && delivery) {
+        await announcePending().catch((e: Error) => {
+          deliveryError = e.message;
+        });
       }
       return out;
     });
@@ -410,6 +414,9 @@ export function createAgent(env: AgentEnv) {
           transactions: outcome.tags.map((t) => ({ hash: t.hash, explorer: EXPLORER_TX(t.hash), tagged: t.tagged })),
           receipt: receiptName(outcome.receiptPath).slice("receipts/".length),
           delivered: Boolean(store().read<Receipt | null>(receiptName(outcome.receiptPath), null)?.payout?.announced),
+          // Not delivered by itself: the page offers to deliver it straight away.
+          canDeliver: delivery && env.hasAdminKey(),
+          deliveryError,
         };
     }
   }

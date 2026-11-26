@@ -608,9 +608,12 @@
         </dl>
         ${x.delivered
           ? callout(`Delivered: ${esc(first(x.freelancer))} will see it on their Receive side by itself. The receipt is for your records.`, "", "shield")
-          : callout(`Send ${esc(first(x.freelancer))} the receipt. It holds what they need to open the payout, and nothing personal.`)}
+          : x.canDeliver
+            ? callout(`Not delivered yet. Deliver it so ${esc(first(x.freelancer))} sees it on their Receive side by itself.${x.deliveryError ? ` Last try: ${esc(x.deliveryError)}` : ""}`, "", "flag")
+            : callout(`Send ${esc(first(x.freelancer))} the receipt. It holds what they need to open the payout, and nothing personal.`)}
         <div class="row">
-          <button class="btn btn-primary" type="button" data-receipt="${esc(x.receipt)}" data-invoice="${esc(x.invoiceId)}">${icon("download")}Download receipt</button>
+          ${!x.delivered && x.canDeliver ? `<button class="btn btn-primary" type="button" id="deliver-now">${icon("send")}Deliver now</button>` : ""}
+          <button class="btn ${!x.delivered && x.canDeliver ? "btn-secondary" : "btn-primary"}" type="button" data-receipt="${esc(x.receipt)}" data-invoice="${esc(x.invoiceId)}">${icon("download")}Download receipt</button>
           <button class="btn btn-secondary" type="button" id="clear">Pay another invoice</button>
         </div>
       </article>`;
@@ -660,6 +663,34 @@
     } finally {
       INV.paying = false;
       await loadState();
+      render();
+    }
+    // Paid, but not announced by itself: ask straight away, so the freelancer sees it on Receive.
+    const x = INV && INV.result;
+    if (x && x.status === "paid" && !x.delivered && x.canDeliver) {
+      const who = first(x.freelancer);
+      if (window.confirm(`Paid. Deliver it to ${who} now?\n\nIt shows up on ${who}'s Receive page by itself. A small Altana fee in USD₮.`)) await deliverNow();
+    }
+  }
+
+  async function deliverNow() {
+    const btn = view.querySelector("#deliver-now");
+    const run = async () => {
+      await api("POST", "/delivery/setup", {});
+      if (INV && INV.result) {
+        INV.result.delivered = true;
+        INV.result.deliveryError = null;
+        toast(`Delivered: ${first(INV.result.freelancer)} will see it on Receive`);
+      }
+      await loadState();
+      render();
+    };
+    if (btn) return busy(btn, "Delivering…", run).catch(() => {});
+    try {
+      await run();
+    } catch (e) {
+      if (INV && INV.result) INV.result.deliveryError = e.message;
+      toast(e.message);
       render();
     }
   }
@@ -1090,7 +1121,7 @@
 
   // ---------- router ----------
   const MENUS = {
-    pay: [["overview", "Overview", "home"], ["invoice", "Pay an invoice", "invoice"], ["freelancers", "Freelancers", "people"], ["access", "Agent access", "key"]],
+    pay: [["overview", "Overview", "home"], ["freelancers", "Freelancers", "people"], ["invoice", "Pay an invoice", "invoice"], ["access", "Agent access", "key"]],
     get: [["payouts", "Payouts", "inbox"], ["code", "Receiving code", "code"]],
   };
   const VIEWS = { pay: { overview, invoice: payInvoice, freelancers, access, guide }, get: { code, payouts, guide } };
@@ -1204,6 +1235,8 @@
       return render();
     }
     switch (t.id) {
+      case "deliver-now":
+        return deliverNow();
       case "delivery-setup":
         return busy(t, "Working", async () => {
           const r = await api("POST", "/delivery/setup", {});

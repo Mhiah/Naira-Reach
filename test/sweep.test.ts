@@ -289,7 +289,8 @@ describe("automatic delivery when things go wrong", () => {
     });
     const up = (await agent.dispatch("POST", "/invoices", { name: "i.json", data: Buffer.from(JSON.stringify({ invoiceId: "INV-P", freelancer: "ada", amountNgn: 2000 })).toString("base64") })) as any;
     const out = (await agent.dispatch("POST", `/invoices/${up.id}/pay`, { approvedUsdt: 2 })) as any;
-    expect(out).toMatchObject({ status: "paid", delivered: false });
+    // The page is told it can deliver it straight away, and why the first try didn't work.
+    expect(out).toMatchObject({ status: "paid", delivered: false, canDeliver: true, deliveryError: expect.stringMatching(/failed/) });
     expect(((await agent.dispatch("GET", "/state")) as any).delivery.pending).toBe(1);
   });
 
