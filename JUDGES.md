@@ -54,7 +54,7 @@ The private address is [`0x2448…9828`](https://celoscan.io/address/0x244863ede
 
 This is the **Altana atomic intent**: approve, swap, payout and gas money as one transaction, sent by Altana's relayer with the client's wallet acting inside it. If any step had failed, none would have happened.
 
-This first payment was a ₦2,000 test from the team to the team's own receiving code. A payment to a real freelancer is the next step.
+This first payment was a ₦2,000 test from the team to the team's own receiving code. The first payment to a real freelancer, Nerom, followed on 26 November: [0xbd7f…f1a5](https://celoscan.io/tx/0xbd7f1a0ab05489db11b6e5cc793e63461095b0a0844704f44d27fdc26d43f1a5).
 
 ### 1b. The same payment, sent by the agent wallet itself
 
@@ -146,7 +146,8 @@ npm run reach -- pay examples/invoice.json --dry-run
 ### Onchain traction
 
 - Live now: the wallet, the ERC-8004 identity, the session key, the first payment and the announcer, all on Celo mainnet and linked above.
-- Next: payments from a real client to a real freelancer. They will be linked in the README's Results as they happen.
+- First real freelancer paid: **Nerom** ([@neromtoobad](https://x.com/neromtoobad)), ₦2,000 on 26 November 2026, checked, swapped, paid and announced in one transaction sent by the agent wallet with the tag: [0xbd7f…f1a5](https://celoscan.io/tx/0xbd7f1a0ab05489db11b6e5cc793e63461095b0a0844704f44d27fdc26d43f1a5). He confirmed it on his Receive page. In his words: "I got paid in naira without sharing my bank details or wallet address. It showed up on my Receive page by itself."
+- AskBots review from the Celo DevRel team (round 1): **9.2 / 10**, [issue #1](https://github.com/Mhiah/Naira-Reach/issues/1).
 
 ---
 
@@ -157,9 +158,9 @@ npm run reach -- pay examples/invoice.json --dry-run
 | Requirement | Status |
 |---|---|
 | Tagged Textile FX conversion on Celo mainnet, in a listed corridor, in the product flow | Done: USD₮ → cNGN, sent by the agent wallet with the tag last: [TEST-003](https://celoscan.io/tx/0xd54014be53c8034b73d4484f32096cb2b7870a8299c075836c99459dde4f7754). Loops House's check shows "Tag seen on-chain" |
-| Local-stablecoin payment to a recipient outside the team | Next: the first payment went to the team's own code |
+| Local-stablecoin payment to a recipient outside the team | Done: ₦2,000 to Nerom, [0xbd7f…f1a5](https://celoscan.io/tx/0xbd7f1a0ab05489db11b6e5cc793e63461095b0a0844704f44d27fdc26d43f1a5) |
 | ERC-8004 identity | Done: [Agent #10090](https://8004scan.io/agents/celo/10090) |
-| A named user with a real job done | Next: comes with the real freelancer payment |
+| A named user with a real job done | Done: Nerom ([@neromtoobad](https://x.com/neromtoobad)), paid for real work |
 
 ### Altana Agent Wallets
 
@@ -194,8 +195,6 @@ npm run reach -- pay examples/invoice.json --dry-run
 
 Said plainly, so nothing is a surprise:
 
-- **The real-user payment** is waiting on the freelancer.
-- **The agent announces through the client's wallet for now.** Its current key was given before announcing was added; the next key includes it.
 - **The demo video** is coming.
 
 The README's [Honest limits](README.md#honest-limits) has the full list.
