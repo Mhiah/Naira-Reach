@@ -767,7 +767,12 @@
           : `<dt>Textile proof</dt><dd>${S.proof ? "expired" : "not signed yet"}</dd>`) : ""}
         <dt>Fees paid in</dt><dd>USD₮</dd>
         <dt>ERC-8004 identity</dt><dd>${w.agentId ? (w.agentPage ? `<a href="${esc(w.agentPage)}" target="_blank" rel="noopener">Agent #${esc(w.agentId)}</a>` : `Agent #${esc(w.agentId)}`) : w.activated ? "Naira Reach" : "After activation"}</dd>
+        ${w.agentId && w.profile ? `<dt>Public profile</dt><dd>${w.profile === "current" ? "Naira Reach" : "Altana's placeholder"}</dd>` : ""}
       </dl>
+      ${w.agentId && w.hasKey && w.profile === "placeholder" ? `<div class="stack" style="gap:8px">
+        <p class="small muted">Your agent's public ERC-8004 profile still shows Altana's icon and link. Update it to Naira Reach's own: name, logo, description and this site. One transaction from your wallet, a few cents in USD₮. No money moves.</p>
+        <div class="row"><button class="btn btn-secondary btn-sm" type="button" id="profile-update">Update ERC-8004 profile</button></div>
+      </div>` : ""}
     </article>`;
 
     const placeCard = HOSTED
@@ -1306,6 +1311,14 @@
         return busy(t, "Revoking", async () => {
           await api("POST", "/session/revoke");
           toast("The agent's key is revoked");
+          await loadState();
+          render();
+        }).catch(() => {});
+      case "profile-update":
+        if (!window.confirm("Update your agent's public ERC-8004 profile to Naira Reach's own?\n\nOne transaction from your wallet. It costs a few cents in USD₮ and moves no money.")) return;
+        return busy(t, "Updating… about 10 seconds", async () => {
+          const r = await api("POST", "/wallet/profile", {});
+          toast(r.status === "unchanged" ? "Your profile is already up to date" : `Profile updated for Agent #${r.agentId}`);
           await loadState();
           render();
         }).catch(() => {});
