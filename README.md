@@ -11,7 +11,7 @@ Built for **Agents Open for Business** (Loops House, on Celo), entering the **St
 <td align="center" width="25%"><b>Live site</b><br><a href="https://nairareach.myacxt.site">nairareach.myacxt.site</a></td>
 <td align="center" width="25%"><b>For judges</b><br><a href="JUDGES.md">JUDGES.md</a>: what to check, in order</td>
 <td align="center" width="25%"><b>Demo video</b><br><a href="https://x.com/myacxt/status/2126570746432389343">Watch on X (2:40)</a></td>
-<td align="center" width="25%"><b>First payment</b><br><a href="https://celoscan.io/tx/0x5131fd5b5d14012e6a97a86a6cb4608264a52eebc1f67bf1e47a7a814d410aea">₦2,000 on Celo</a></td>
+<td align="center" width="25%"><b>First freelancer paid</b><br><a href="https://celoscan.io/tx/0xbd7f1a0ab05489db11b6e5cc793e63461095b0a0844704f44d27fdc26d43f1a5">₦2,000 to Nerom</a></td>
 </tr>
 <tr>
 <td align="center"><b>Agent identity</b><br><a href="https://8004scan.io/agents/celo/10090">ERC-8004 #10090</a></td>
@@ -86,7 +86,7 @@ Everything below is live on Celo mainnet (chain 42220) and can be checked on the
 | **Live website** | [nairareach.myacxt.site](https://nairareach.myacxt.site), Send and Receive on one site, hosted on Vercel |
 | **Client wallet** | [`0xB2441B175d620A3Fd5CDef28fA1c6957e6224431`](https://celoscan.io/address/0xB2441B175d620A3Fd5CDef28fA1c6957e6224431), an Altana wallet (EIP-7702), activated |
 | **ERC-8004 identity** | [Agent #10090, "Naira Reach"](https://8004scan.io/agents/celo/10090), registered by the wallet's first transaction and confirmed by the Loops House check |
-| **The agent's key** | 200 USD₮ a week, valid until 22 December 2026. Given on 22 November, replacing the first key (10 USD₮ and ₦15,000 a week), and allowed to announce payouts itself. Listed in Altana's KeyStore: [the wallet's keys and permissions](https://explorer.altana.network/account/0xB2441B175d620A3Fd5CDef28fA1c6957e6224431) |
+| **The agent's key** | 200 USD₮ and ₦300,000 a week, five allowed calls, valid until 22 December 2026. Given on 22 November, replacing the first key (10 USD₮ and ₦15,000 a week), and allowed to announce payouts itself. Listed in Altana's KeyStore: [the wallet's keys and permissions](https://explorer.altana.network/account/0xB2441B175d620A3Fd5CDef28fA1c6957e6224431) |
 | **First payment** | ₦2,000 (test invoice TEST-002) for 1.388823 USD₮, at ₦1,440.07 per USD₮. Textile RFQ `rfq_vLcBoGXicFHjHMbv`. Approve, swap, private payout and gas money in **one atomic Altana intent**: [0x5131…0aea](https://celoscan.io/tx/0x5131fd5b5d14012e6a97a86a6cb4608264a52eebc1f67bf1e47a7a814d410aea) |
 | **Where the money went** | 1.388546 USD₮ to Textile's maker plus 0.000277 USD₮ fee. Exactly 2,000 cNGN and 0.05 USD₮ of gas money to a fresh private address, [`0x2448…9828`](https://celoscan.io/address/0x244863ede6688da2a60d2f77fd4ed9ee75729828). Nothing left behind: the wallet holds 0 cNGN and its leftover allowance to Textile is 0 |
 | **Automatic delivery** | The standard ERC-5564 announcer, deployed on Celo by Naira Reach at the same address it has on other chains: [`0x5564…5564`](https://celoscan.io/address/0x55649E01B5Df198D18D95b5cc5051630cfD45564). The ₦2,000 was announced in [0x14b4…5fc9](https://celoscan.io/tx/0x14b4850f552900f143b26ecc45e35721f5eeed7e1ab91ab3a50ca2633bed5fc9), and the Receive page found it with nothing but the receiver's own keys |
@@ -104,7 +104,7 @@ Everything below is live on Celo mainnet (chain 42220) and can be checked on the
 
 | Requirement | How Naira Reach meets it | Proof |
 |---|---|---|
-| A tagged Textile FX conversion on Celo mainnet, in a listed corridor, used in the product flow | Every invoice is settled by a USD₮ → cNGN conversion through Textile FX. The conversion is the payment itself | [First payment](https://celoscan.io/tx/0x5131fd5b5d14012e6a97a86a6cb4608264a52eebc1f67bf1e47a7a814d410aea) |
+| A tagged Textile FX conversion on Celo mainnet, in a listed corridor, used in the product flow | Every invoice is settled by a USD₮ → cNGN conversion through Textile FX. The conversion is the payment itself | [Nerom's payment](https://celoscan.io/tx/0xbd7f1a0ab05489db11b6e5cc793e63461095b0a0844704f44d27fdc26d43f1a5) and [TEST-003](https://celoscan.io/tx/0xd54014be53c8034b73d4484f32096cb2b7870a8299c075836c99459dde4f7754), both tagged and sent by the agent wallet |
 | A local-stablecoin payment that reaches a recipient outside the team | The cNGN goes to the freelancer at a brand-new address nobody funded beforehand | [Nerom's payment](https://celoscan.io/tx/0xbd7f1a0ab05489db11b6e5cc793e63461095b0a0844704f44d27fdc26d43f1a5), to a fresh private address only he can open |
 | An ERC-8004 identity | The wallet registers as "Naira Reach" in the ERC-8004 registry on its first action | [Agent #10090](https://8004scan.io/agents/celo/10090) |
 | A named user with a real job done | A real client paying a real freelancer for real work | Nerom ([@neromtoobad](https://x.com/neromtoobad)), paid ₦2,000 on 26 November: [0xbd7f…f1a5](https://celoscan.io/tx/0xbd7f1a0ab05489db11b6e5cc793e63461095b0a0844704f44d27fdc26d43f1a5) |

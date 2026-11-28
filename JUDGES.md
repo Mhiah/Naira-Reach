@@ -5,7 +5,7 @@ This page walks through what to check, in order, with what you should see at eac
 <table>
 <tr>
 <td align="center" width="25%"><b>Live site</b><br><a href="https://nairareach.myacxt.site">nairareach.myacxt.site</a></td>
-<td align="center" width="25%"><b>First payment</b><br><a href="https://celoscan.io/tx/0x5131fd5b5d14012e6a97a86a6cb4608264a52eebc1f67bf1e47a7a814d410aea">0x5131…0aea</a></td>
+<td align="center" width="25%"><b>First freelancer paid</b><br><a href="https://celoscan.io/tx/0xbd7f1a0ab05489db11b6e5cc793e63461095b0a0844704f44d27fdc26d43f1a5">Nerom, 0xbd7f…f1a5</a></td>
 <td align="center" width="25%"><b>ERC-8004</b><br><a href="https://8004scan.io/agents/celo/10090">Agent #10090</a></td>
 <td align="center" width="25%"><b>Demo video</b><br><a href="https://x.com/myacxt/status/2126570746432389343">Watch on X (2:40)</a></td>
 </tr>
@@ -68,7 +68,7 @@ Altana's relayer sent the first payment, so Loops House didn't count it: it coun
 ### 2. The agent's identity and its key
 
 - [Agent #10090 on 8004scan](https://8004scan.io/agents/celo/10090): "Naira Reach", registered by the wallet's first transaction.
-- [The wallet on Altana's explorer](https://explorer.altana.network/account/0xB2441B175d620A3Fd5CDef28fA1c6957e6224431): the session key, its weekly caps (10 USD₮ and ₦15,000), its expiry, and the calls it's allowed to make.
+- [The wallet on Altana's explorer](https://explorer.altana.network/account/0xB2441B175d620A3Fd5CDef28fA1c6957e6224431): the session key, its weekly caps (200 USD₮ and ₦300,000), its expiry (22 December 2026), and the calls it's allowed to make.
 - [The wallet on Celoscan](https://celoscan.io/address/0xB2441B175d620A3Fd5CDef28fA1c6957e6224431): an EIP-7702 account, so the wallet's address is the client's own key address.
 
 ### 3. Automatic delivery
@@ -168,7 +168,7 @@ npm run reach -- pay examples/invoice.json --dry-run
 |---|---|
 | Non-custodial Altana wallet | Done: the client's own wallet; the key stays locked in the client's browser |
 | Person-granted session key | Done: given on **Agent access** |
-| Spend cap, contract allowlist, expiry | Done: weekly USD₮ and cNGN caps, five allowed calls (four on the current key), up to 90 days, enforced onchain |
+| Spend cap, contract allowlist, expiry | Done: weekly USD₮ and cNGN caps, five allowed calls on the current key (USD₮ approve and transfer, the Textile swap, cNGN transfer, the payout announcer; the first key had four, without the announcer), up to 90 days, enforced onchain |
 | Revocable | Done: **Revoke the agent's key**, effective from the next block |
 
 ---
@@ -195,6 +195,7 @@ npm run reach -- pay examples/invoice.json --dry-run
 
 Said plainly, so nothing is a surprise:
 
-- **The demo video** is done: [watch it on X](https://x.com/myacxt/status/2126570746432389343) (2:40).
+- **One real freelancer so far.** Nerom is the first; more are welcome, and anyone can make a receiving code on the live site.
+- **Payouts reach naira in a bank through an exchange.** The freelancer moves the cNGN to an exchange that takes cNGN on Celo, then withdraws; Naira Reach doesn't do the bank step itself.
 
 The README's [Honest limits](README.md#honest-limits) has the full list.
