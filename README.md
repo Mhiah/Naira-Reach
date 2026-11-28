@@ -17,7 +17,7 @@ Built for **Agents Open for Business** (Loops House, on Celo), entering the **St
 <td align="center"><b>Agent identity</b><br><a href="https://8004scan.io/agents/celo/10090">ERC-8004 #10090</a></td>
 <td align="center"><b>Client wallet</b><br><a href="https://celoscan.io/address/0xB2441B175d620A3Fd5CDef28fA1c6957e6224431">0xB244…4431</a></td>
 <td align="center"><b>Agent's key</b><br><a href="https://explorer.altana.network/account/0xB2441B175d620A3Fd5CDef28fA1c6957e6224431">Altana explorer</a></td>
-<td align="center"><b>Tests</b><br><a href="#tests">200 passing</a></td>
+<td align="center"><b>Tests</b><br><a href="#tests">211 passing</a></td>
 </tr>
 </table>
 
@@ -93,7 +93,7 @@ Everything below is live on Celo mainnet (chain 42220) and can be checked on the
 | **Tagged payment from the agent wallet** | ₦2,000 (test invoice TEST-003), still signed by the agent's limited key as one atomic Altana intent, but **sent by the wallet itself** with the Loops House code as the last bytes of the transaction: [0xd540…7754](https://celoscan.io/tx/0xd54014be53c8034b73d4484f32096cb2b7870a8299c075836c99459dde4f7754). Its announcement went the same way: [0xa390…f96a](https://celoscan.io/tx/0xa390411fe01da15bc0b388d9b8a70a22ebc817a71ed43ef259e6674fd2eff96a). Loops House's own check now shows **"Tag seen on-chain"** for this entry |
 | **First real freelancer** | ₦2,000 to **Nerom** ([@neromtoobad](https://x.com/neromtoobad)) on 26 November 2026, for 1.39 USD₮. Checked, swapped, paid and announced in one transaction, signed by the agent's key and sent by the wallet with the Loops House code: [0xbd7f…f1a5](https://celoscan.io/tx/0xbd7f1a0ab05489db11b6e5cc793e63461095b0a0844704f44d27fdc26d43f1a5). He confirmed it arrived on his Receive page. In his words: "I got paid in naira without sharing my bank details or wallet address. It showed up on my Receive page by itself." |
 | **Attribution** | Every call inside a payment carries the Loops House code (ERC-8021), and so does the outer transaction now that the wallet sends it. The first payment (TEST-002) went through Altana's relayer, so it isn't counted; every payment since is |
-| **Tests** | 200 passing, no network needed. See [Tests](#tests) |
+| **Tests** | 211 passing, no network needed. See [Tests](#tests) |
 | **Live checks** | Textile's live preview gave a flat ₦1,442.52 per USD₮ from ₦1,000 to ₦20,000,000, with a 0.02% fee, answering in 0.3 to 1.1 seconds. A ₦150,000 quote didn't move at all over 66 seconds of sampling |
 
 ---
@@ -343,7 +343,7 @@ npm install
 npm test
 ```
 
-**200 tests in 15 files, all passing, with no network needed.** They cover:
+**211 tests in 16 files, all passing, with no network needed.** They cover:
 
 | Area | What is checked |
 |---|---|
@@ -358,6 +358,7 @@ npm test
 | Invoices | Redaction before the AI reader (emails, phones and account numbers however they're written, IBANs, wallet addresses), strict amounts (no booleans, hex or exponents), size limits |
 | The agent's key | A key the wallet no longer holds (replaced or revoked, maybe from another browser) shows as such and can't start a payment; an unreachable Celo doesn't count as gone. Raw Textile and Altana failures come back as plain sentences |
 | Withdrawing | The client's own transfer signed against a simulated Celo node and decoded: right amount and address, USD₮ fee and tag, plain CELO. What Max leaves for the fee. Refuses the zero address, the wallet itself, token contracts and bad amounts, and needs the client's own key |
+| ERC-8004 profile | The new registration file (Naira Reach's name, logo, site and its own registry entry), the data: URI decoding back to it, the tagged setAgentURI sent from the wallet with the fee in USD₮, nothing sent if it's already current, and refusing an identity another wallet owns |
 | Keys | The password vault (wrong password, tampered file), the browser's key handling |
 | Website | The local server's protections, the Textile relay's allowlist and limits |
 | Full flow | Pay from start to finish with a mocked Textile and wallet, including failures |
