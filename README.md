@@ -10,7 +10,7 @@ Built for **Agents Open for Business** (Loops House, on Celo), entering the **St
 <tr>
 <td align="center" width="25%"><b>Live site</b><br><a href="https://nairareach.myacxt.site">nairareach.myacxt.site</a></td>
 <td align="center" width="25%"><b>For judges</b><br><a href="JUDGES.md">JUDGES.md</a>: what to check, in order</td>
-<td align="center" width="25%"><b>Demo video</b><br>Coming soon</td>
+<td align="center" width="25%"><b>Demo video</b><br><a href="https://x.com/myacxt/status/2126570746432389343">Watch on X (2:40)</a></td>
 <td align="center" width="25%"><b>First payment</b><br><a href="https://celoscan.io/tx/0x5131fd5b5d14012e6a97a86a6cb4608264a52eebc1f67bf1e47a7a814d410aea">₦2,000 on Celo</a></td>
 </tr>
 <tr>

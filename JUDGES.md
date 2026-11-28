@@ -7,7 +7,7 @@ This page walks through what to check, in order, with what you should see at eac
 <td align="center" width="25%"><b>Live site</b><br><a href="https://nairareach.myacxt.site">nairareach.myacxt.site</a></td>
 <td align="center" width="25%"><b>First payment</b><br><a href="https://celoscan.io/tx/0x5131fd5b5d14012e6a97a86a6cb4608264a52eebc1f67bf1e47a7a814d410aea">0x5131…0aea</a></td>
 <td align="center" width="25%"><b>ERC-8004</b><br><a href="https://8004scan.io/agents/celo/10090">Agent #10090</a></td>
-<td align="center" width="25%"><b>Demo video</b><br>Coming soon</td>
+<td align="center" width="25%"><b>Demo video</b><br><a href="https://x.com/myacxt/status/2126570746432389343">Watch on X (2:40)</a></td>
 </tr>
 </table>
 
@@ -195,6 +195,6 @@ npm run reach -- pay examples/invoice.json --dry-run
 
 Said plainly, so nothing is a surprise:
 
-- **The demo video** is coming.
+- **The demo video** is done: [watch it on X](https://x.com/myacxt/status/2126570746432389343) (2:40).
 
 The README's [Honest limits](README.md#honest-limits) has the full list.
