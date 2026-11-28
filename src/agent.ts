@@ -15,7 +15,7 @@ import { MAX_INVOICE_NGN, type Invoice, type InvoiceFile } from "./invoice.ts";
 import { payInvoice, reviewInvoice, type PayOutcome } from "./pay.ts";
 import { storedProofInfo } from "./proof.ts";
 import { checkDestination, parseAmount, withdraw, type WithdrawToken } from "./withdraw.ts";
-import { currentAgentUri, registrationUri, updateAgentProfile } from "./identity.ts";
+import { IDENTITY_ABI, registrationUri, updateAgentProfile } from "./identity.ts";
 import { parseMetaAddress } from "./stealth.ts";
 import { receiptName, store } from "./store.ts";
 import type { TextileClient } from "./textile.ts";
@@ -291,7 +291,7 @@ export function createAgent(env: AgentEnv) {
     if (!agentId) return null;
     if (profileCache && profileCache.agentId === agentId && now() - profileCache.at < 60_000) return profileCache.value;
     try {
-      const uri = await withTimeout(currentAgentUri(env.reader, agentId), 8000);
+      const uri = await withTimeout(env.reader.readContract({ address: ERC8004_IDENTITY_REGISTRY, abi: IDENTITY_ABI, functionName: "tokenURI", args: [BigInt(agentId)] }), 8000);
       const value = uri === registrationUri(agentId) ? "current" : "placeholder";
       profileCache = { at: now(), agentId, value };
       return value;
