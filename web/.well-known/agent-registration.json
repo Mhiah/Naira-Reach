@@ -1,0 +1,23 @@
+{
+  "type": "https://eips.ethereum.org/EIPS/eip-8004#registration-v1",
+  "name": "Naira Reach",
+  "description": "Pays a Nigerian freelancer for a client abroad, in naira on Celo. It checks the invoice, converts the client's USD₮ to cNGN through Textile FX, and pays the exact naira billed to a private address only the freelancer can open. It works from the client's own Altana wallet, under a session key with weekly caps, a list of allowed calls and an expiry.",
+  "image": "https://nairareach.myacxt.site/agent-logo.png",
+  "services": [
+    {
+      "name": "web",
+      "endpoint": "https://nairareach.myacxt.site"
+    }
+  ],
+  "x402Support": false,
+  "active": true,
+  "registrations": [
+    {
+      "agentId": 10090,
+      "agentRegistry": "eip155:42220:0x8004A169FB4a3325136EB29fA0ceB6D2e539a432"
+    }
+  ],
+  "supportedTrust": [
+    "reputation"
+  ]
+}

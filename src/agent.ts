@@ -15,6 +15,7 @@ import { MAX_INVOICE_NGN, type Invoice, type InvoiceFile } from "./invoice.ts";
 import { payInvoice, reviewInvoice, type PayOutcome } from "./pay.ts";
 import { storedProofInfo } from "./proof.ts";
 import { checkDestination, parseAmount, withdraw, type WithdrawToken } from "./withdraw.ts";
+import { currentAgentUri, registrationUri, updateAgentProfile } from "./identity.ts";
 import { parseMetaAddress } from "./stealth.ts";
 import { receiptName, store } from "./store.ts";
 import type { TextileClient } from "./textile.ts";
@@ -38,6 +39,8 @@ export type Actions = {
   walletCalls: (calls: Call[], opts: { tag: boolean }) => Promise<{ status: string; hash?: Hex }>;
   /** Send USD₮ or CELO out of the client's own wallet, signed with the client's key. */
   withdraw: (w: { token: WithdrawToken; to: string; amount: string }) => Promise<{ token: WithdrawToken; amount: string; to: Address; hash: Hex }>;
+  /** Replace the placeholder ERC-8004 profile with Naira Reach's, from the client's own wallet. */
+  updateProfile: (agentId: string) => Promise<{ status: "updated" | "unchanged"; hash?: Hex; agentId: string }>;
 };
 
 export type AgentEnv = {
@@ -282,16 +285,32 @@ export function createAgent(env: AgentEnv) {
     return announcePending();
   }
 
+  // Whether the ERC-8004 profile is still Altana's placeholder. Read at most once a minute.
+  let profileCache: { at: number; agentId: string; value: "current" | "placeholder" } | null = null;
+  async function profileState(agentId: string | undefined): Promise<"current" | "placeholder" | null> {
+    if (!agentId) return null;
+    if (profileCache && profileCache.agentId === agentId && now() - profileCache.at < 60_000) return profileCache.value;
+    try {
+      const uri = await withTimeout(currentAgentUri(env.reader, agentId), 8000);
+      const value = uri === registrationUri(agentId) ? "current" : "placeholder";
+      profileCache = { at: now(), agentId, value };
+      return value;
+    } catch {
+      return null; // Celo unreachable: say nothing rather than guess.
+    }
+  }
+
   async function state() {
     const ledger = loadLedger();
     const freelancers = loadFreelancers();
     const wallet = walletAddress();
     const client = loadClientRecord();
-    const [live, liveRate, announcer, onChain] = await Promise.all([
+    const [live, liveRate, announcer, onChain, profile] = await Promise.all([
       wallet ? balances(wallet).then((v) => ({ ok: true as const, ...v }), (e: Error) => ({ ok: false as const, error: e.message })) : null,
       rate().then((v) => ({ ok: true as const, ...v }), (e: Error) => ({ ok: false as const, error: e.message })),
       announcerIsLive(),
       keyOnChain(),
+      profileState(client.agentId),
     ]);
     const proof = storedProofInfo();
     const paid = ledger.map((e) => {
@@ -337,6 +356,7 @@ export function createAgent(env: AgentEnv) {
         activationTx: client.activationTx ?? null,
         agentId: client.agentId ?? null,
         agentPage: client.agentId ? (agentPageUrl(CELO_CHAIN_ID, client.agentId) ?? null) : null,
+        profile,
         live,
       },
       session: sessionView(ledger, onChain),
@@ -548,6 +568,15 @@ export function createAgent(env: AgentEnv) {
       }
       return exclusive("withdrawing from your wallet", () => actions.withdraw({ token, to, amount }));
     }
+    if (is("POST", "wallet", true) && id === "profile") {
+      // Signed with the client's own key: the registry lets only the identity's owner change it.
+      if (!env.hasAdminKey() || !env.rpcUrl) throw new AgentError(400, "Updating the profile needs your wallet key here.");
+      const agentId = loadClientRecord().agentId;
+      if (!agentId) throw new AgentError(400, "This wallet has no ERC-8004 identity yet. It's registered when the wallet is activated.");
+      const r = await exclusive("updating your agent's public profile", () => actions.updateProfile(agentId));
+      profileCache = null;
+      return r;
+    }
     if (is("POST", "delivery", true) && id === "setup") {
       return exclusive("turning on automatic delivery", setupDelivery);
     }
@@ -580,6 +609,7 @@ function defaultActions(env: AgentEnv): Actions {
     revoke: () => revokeAgentSession(env.adminKey()),
     proofRefresh: () => refreshTakerProof(env.adminKey()),
     withdraw: (w) => withdraw({ adminKey: env.adminKey(), rpcUrl: env.rpcUrl!, code: code(), ...w }),
+    updateProfile: (agentId) => updateAgentProfile({ adminKey: env.adminKey(), rpcUrl: env.rpcUrl!, agentId, code: code(), reader: env.reader }),
     walletCalls: (calls, opts) => walletExecute(env.adminKey(), calls, opts.tag ? code() : null, selfSubmit() ? { rpcUrl: env.rpcUrl!, code: code() } : undefined),
     pay: async (invoice, opts) => {
       // Textile's wallet proof lasts about 11 hours. With the client's key at hand, renew it rather than fail.
